@@ -1,4 +1,5 @@
 import os
+import logging
 import gym
 from gym import spaces
 import numpy as np
@@ -26,11 +27,6 @@ class ImageToPyTorch(gym.ObservationWrapper):
                                 old_shape[1], old_shape[2]),
                                 dtype=np.float32)
 
-def reshape_obs(obs, shape):
-    obs = obs.squeeze(1)
-    obs = torch.from_numpy(np.transpose(obs, (0, 3, 1, 2)))
-    return obs
-
 
 def make_offworld_env(
                     env_name='OffWorldDockerMonolithDiscreteSim-v0',
@@ -51,8 +47,7 @@ def make_offworld_env(
     experiment_name: user cunstom experiment name.
 
     """
-    if env_type = 'sim':
-        print("runnning on simulator")
+    if env_type == 'sim':
         if channel_type == 'DEPTH_ONLY':
             return  gym.make(env_name, channel_type=Channels.DEPTH_ONLY)
         elif channel_type == 'RGB':
@@ -60,16 +55,15 @@ def make_offworld_env(
         else:
             return  gym.make(env_name, channel_type=Channels.RGBD)
     else:
-        print("runnning on real robot")
         if channel_type == 'DEPTH_ONLY':
             return  gym.make(env_name, channel_type=Channels.DEPTH_ONLY, resume_experiment=True,
-                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TEST, experiment_name=experiment_name)
+                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
         elif channel_type == 'RGB':
             return  gym.make(env_name, channel_type=Channels.RGB, resume_experiment=True,
-                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TEST, experiment_name=experiment_name)
+                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
         else:
             return  gym.make(env_name, channel_type=Channels.RGBD, resume_experiment=True,
-                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TEST, experiment_name=experiment_name)
+                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
 
 def make_vec_env(make_env, num_envs, gamma):
 
@@ -82,11 +76,15 @@ def make_vec_env(make_env, num_envs, gamma):
     gamma: discount factor for future steps.
     """
     envs = [make_env for i in range(num_envs)]
+
     if num_envs == 1:
         envs = DummyVecEnv(envs)
     else:
         envs = SubprocVecEnv(envs)
-    envs = VecNormalize(envs, gamma=gamma, ob=False, ret=False)
+
+    envs = VecNormalize(envs, norm_obs=True, norm_reward=True)
+
+
     return envs
 
 

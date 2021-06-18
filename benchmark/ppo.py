@@ -2,8 +2,8 @@ from offworld_gym import version
 __version__     = version.__version__
 
 import os
-os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
-os.environ['CUDA_VISIBLE_DEVICES']='0'
+# os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
+# os.environ['CUDA_VISIBLE_DEVICES']='0'
 import sys
 import time
 import pickle
@@ -28,9 +28,13 @@ from tensorboardX import SummaryWriter
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.policies import ActorCriticPolicy
+# from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import VecFrameStack
 
-from offworld_gym_wrapper import make_offworld_env, make_vec_env, ImageToPyTorch, reshape_obs
+from offworld_gym_wrapper import make_offworld_env, make_vec_env, ImageToPyTorch
 from custom_cnn_policy import CustomCNN
+from callback import SaveOnBestTrainingRewardCallback
+from typing import Callable
 
 
 def parser():
@@ -38,7 +42,7 @@ def parser():
     parser.add_argument(
         '--model_name', default='PPO-SIM-Discrete', help='model name')
     parser.add_argument(
-        '--num_envs', type=int, default=10, help='num of parallel training envs in sim')
+        '--num_envs', type=int, default=1, help='num of parallel training envs in sim')
     parser.add_argument(
         '--resume_folder', type=str, default=None, help='folder to resume training')
     parser.add_argument(
@@ -76,30 +80,58 @@ def parser():
 
     return args
 
-    def logging(summary,i,value_loss,action_loss,dist_entropy,episodic_rewards):
-        summary.add_scalar('log/value_loss', value_loss, i)
-        summary.add_scalar('log/action_loss', action_loss, i)
-        summary.add_scalar('log/entropy_loss', dist_entropy, i)
-        summary.add_scalar('log/episodic_reward',  episodic_rewards.mean(), i)
 
-    def main():
-        # parse arguments
-        args = parser()
-        # setting cuda env
-        torch.manual_seed(42)  # universal  magic number 42
-        torch.cuda.manual_seed_all(42)
-        device = torch.device("cpu" if args.no_cuda else "cuda:0")
+def linear_schedule(initial_value: float) -> Callable[[float], float]:
+    """
+    Linear learning rate schedule.
 
-        # setting folder and logger
-        checkpoint_folder = os.path.join(args.checkpoint_folder, args.model_name)
-        log_folder = "logs/" + args.model_name
-        if not os.path.exists(checkpoint_folder): os.makedirs(checkpoint_folder)
-        if not os.path.exists(log_folder): os.makedirs(log_folder)
-        summary = SummaryWriter(logdir=log_folder)
+    :param initial_value: Initial learning rate.
+    :return: schedule that computes
+      current learning rate depending on remaining progress
+    """
+    def func(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0.
 
+        :param progress_remaining:
+        :return: current learning rate
+        """
+        return progress_remaining * initial_value
+
+    return func
+
+def main():
+    # parse arguments
+    args = parser()
+    # setting cuda env
+    torch.manual_seed(42)  # universal  magic number 42
+    torch.cuda.manual_seed_all(42)
+    device = torch.device("cpu" if args.no_cuda else "cuda:0")
+
+    # setting folder and logger
+    # checkpoint_folder = os.path.join(args.checkpoint_folder, args.model_name)
+    log_folder = "logs/" + args.model_name
+    # if not os.path.exists(checkpoint_folder): os.makedirs(checkpoint_folder)
+    if not os.path.exists(log_folder): os.makedirs(log_folder)
+    # summary = SummaryWriter(logdir=log_folder)
+
+    # build offworld envs
+    make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0')
+    env = make_vec_env(make_offworld_env, num_envs=args.num_envs, gamma=args.gamma)
+    env = VecFrameStack(env, n_stack=4)
+
+    # initailize PPO agent
+    policy_kwargs = dict(
+                    features_extractor_class=CustomCNN,
+                    features_extractor_kwargs=dict(features_dim=128),)
+
+    model = PPO("CnnPolicy", env=env, policy_kwargs=policy_kwargs, learning_rate=linear_schedule(args.lr), tensorboard_log=log_folder,verbose=1)
+
+    callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_folder)
+
+    model.learn(args.num_env_steps)
         
 
         
-
 if __name__ == "__main__":
     main()

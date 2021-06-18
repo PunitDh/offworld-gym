@@ -1,11 +1,17 @@
 # Reference: https://stable-baselines3.readthedocs.io/en/master/guide/custom_policy.html
 
 import gym
-import torch as th
+import numpy as np
+import torch 
 import torch.nn as nn
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+
+def reshape_obs(obs):
+    obs = obs.squeeze(1)
+    obs = obs.permute(0, 3, 1, 2)
+    return obs
 
 class ConvBlock(nn.Module):
     def __init__(self, input_size, output_size, kernel_size=5, stride=1):
@@ -30,9 +36,9 @@ class CustomCNN(BaseFeaturesExtractor):
 
     def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 256):
         super(CustomCNN, self).__init__(observation_space, features_dim)
-        # We assume CxHxW images (channels first)
+        # We assume HxWxC images (channels last)
         # Re-ordering will be done by pre-preprocessing or wrapper
-        n_input_channels = observation_space.shape[0]
+        n_input_channels = observation_space.shape[-1]
         self.cnn = nn.Sequential(
             nn.Conv2d(n_input_channels, 32, kernel_size=8, stride=4, padding=0),
             nn.ReLU(),
@@ -42,12 +48,14 @@ class CustomCNN(BaseFeaturesExtractor):
         )
 
         # Compute shape by doing one forward pass
-        with th.no_grad():
+        with torch.no_grad():
+            observation_space = np.transpose(observation_space.sample(), (0, 3, 1, 2))
             n_flatten = self.cnn(
-                th.as_tensor(observation_space.sample()[None]).float()
+                torch.as_tensor(observation_space).float()
             ).shape[1]
 
         self.linear = nn.Sequential(nn.Linear(n_flatten, features_dim), nn.ReLU())
 
-    def forward(self, observations: th.Tensor) -> th.Tensor:
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        observations = reshape_obs(observations)
         return self.linear(self.cnn(observations))
