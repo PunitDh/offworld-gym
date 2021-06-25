@@ -16,3 +16,5 @@ models/
 *.dill
 docs/_build
 
+benchmark/PPO-Continuous.zip
+benchmark/PPO-Discrete.zip

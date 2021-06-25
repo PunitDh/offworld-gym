@@ -41,8 +41,10 @@ from typing import Callable
 
 def parser():
     parser = argparse.ArgumentParser(description='PPO')
+    # parser.add_argument(
+    #     '--model_name', default='PPO-SIM-Continuous', help='model name')
     parser.add_argument(
-        '--model_name', default='PPO-SIM-Continuous', help='model name')
+        '--model_name', default='PPO-SIM-Discrete', help='model name')
     parser.add_argument(
         '--num_envs', type=int, default=6, help='num of parallel training envs in sim')
     parser.add_argument(
@@ -103,6 +105,7 @@ def linear_schedule(initial_value: float) -> Callable[[float], float]:
     return func
 
 def main():
+    torch.set_num_threads(1)
     # parse arguments
     args = parser()
     # setting cuda env
@@ -118,9 +121,10 @@ def main():
     # summary = SummaryWriter(logdir=log_folder)
 
     # build offworld envs
-    # make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', model_name=args.model_name)
-    make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', model_name=args.model_name)
-    env = make_vec_env(make_offworld_env, num_envs=args.num_envs)
+    make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', model_name=args.model_name)
+    # make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', model_name=args.model_name)
+    train_env = make_vec_env(make_offworld_env, num_envs=args.num_envs)
+    eval_env =  make_vec_env(make_offworld_env, num_envs=1)
     # env = VecFrameStack(env, n_stack=4)
 
     # initailize PPO agent
@@ -132,16 +136,16 @@ def main():
     policy_kwargs["optimizer_class"] = RMSpropTFLike
     policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)
 
-    model = PPO("CnnPolicy", env=env, policy_kwargs=policy_kwargs, n_epochs=args.ppo_epoch,ent_coef=args.entropy_coef,
+    model = PPO("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, n_epochs=args.ppo_epoch,ent_coef=args.entropy_coef,
                 n_steps=args.num_steps,learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,clip_range=args.clip_param,
-                clip_range_vf=None, tensorboard_log=log_folder,verbose=1)
+                clip_range_vf=None, tensorboard_log=log_folder,device=device,verbose=1)
 
     
-    callback = EvalCallback(eval_env = env,eval_freq=5000,log_path=log_folder,best_model_save_path=log_folder)
+    callback = EvalCallback(eval_env = eval_env,eval_freq=5000,log_path=log_folder,best_model_save_path=log_folder)
     model.learn(args.num_env_steps,callback= callback)
 
-    # model.save("PPO-Discrete")
-    model.save("PPO-Continuous")
+    model.save("PPO-Discrete")
+    # model.save("PPO-Continuous")
         
 
         
