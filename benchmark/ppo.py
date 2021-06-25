@@ -28,8 +28,10 @@ from tensorboardX import SummaryWriter
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.policies import ActorCriticPolicy
-# from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import VecFrameStack
+from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.sb2_compat.rmsprop_tf_like import RMSpropTFLike
+
 
 from offworld_gym_wrapper import make_offworld_env, make_vec_env, ImageToPyTorch
 from custom_cnn_policy import CustomCNN
@@ -40,9 +42,9 @@ from typing import Callable
 def parser():
     parser = argparse.ArgumentParser(description='PPO')
     parser.add_argument(
-        '--model_name', default='PPO-SIM-Discrete', help='model name')
+        '--model_name', default='PPO-SIM-Continuous', help='model name')
     parser.add_argument(
-        '--num_envs', type=int, default=1, help='num of parallel training envs in sim')
+        '--num_envs', type=int, default=6, help='num of parallel training envs in sim')
     parser.add_argument(
         '--resume_folder', type=str, default=None, help='folder to resume training')
     parser.add_argument(
@@ -62,17 +64,17 @@ def parser():
     parser.add_argument( 
         '--max_grad_norm', type=float, default=0.5, help='max norm of gradients (default: 0.5)')
     parser.add_argument(
-        '--num_steps',type=int, default=100, help='frequency of parameter update')
+        '--num_steps',type=int, default=128, help='frequency of parameter update')
     parser.add_argument(
         '--ppo_epoch',type=int,default=4, help='number of ppo epochs (default: 4)')
     parser.add_argument(
-        '--num_mini_batch',type=int, default=32, help='number of batches for ppo (default: 32)')
+        '--num_mini_batch',type=int, default=64, help='number of batches for ppo (default: 32)')
     parser.add_argument(
         '--clip_param',type=float,default=0.2,help='ppo clip parameter (default: 0.2)')
     parser.add_argument(
-        '--num_env_steps', type=int, default=5e5, help='number of environment steps to train (default: 1e6)')
+        '--num_env_steps', type=int, default=2.5e5, help='number of environment steps to train (default: 1e6)')
     parser.add_argument(
-        '--lr', type=int, default=5e-4, help='learning rate')
+        '--lr', type=int, default=3e-4, help='learning rate')
 
     parser.add_argument(
         '--no_cuda', action='store_true', help='debug without cuda')
@@ -116,20 +118,30 @@ def main():
     # summary = SummaryWriter(logdir=log_folder)
 
     # build offworld envs
-    make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0')
-    env = make_vec_env(make_offworld_env, num_envs=args.num_envs, gamma=args.gamma)
-    env = VecFrameStack(env, n_stack=4)
+    # make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', model_name=args.model_name)
+    make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', model_name=args.model_name)
+    env = make_vec_env(make_offworld_env, num_envs=args.num_envs)
+    # env = VecFrameStack(env, n_stack=4)
 
     # initailize PPO agent
     policy_kwargs = dict(
                     features_extractor_class=CustomCNN,
-                    features_extractor_kwargs=dict(features_dim=128),)
+                    features_extractor_kwargs=dict(features_dim=256),
+                    net_arch=[dict(vf=[64,64,32],pi=[64,64])],)
 
-    model = PPO("CnnPolicy", env=env, policy_kwargs=policy_kwargs, learning_rate=linear_schedule(args.lr), tensorboard_log=log_folder,verbose=1)
+    policy_kwargs["optimizer_class"] = RMSpropTFLike
+    policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)
 
-    callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_folder)
+    model = PPO("CnnPolicy", env=env, policy_kwargs=policy_kwargs, n_epochs=args.ppo_epoch,ent_coef=args.entropy_coef,
+                n_steps=args.num_steps,learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,clip_range=args.clip_param,
+                clip_range_vf=None, tensorboard_log=log_folder,verbose=1)
 
-    model.learn(args.num_env_steps)
+    
+    callback = EvalCallback(eval_env = env,eval_freq=5000,log_path=log_folder,best_model_save_path=log_folder)
+    model.learn(args.num_env_steps,callback= callback)
+
+    # model.save("PPO-Discrete")
+    model.save("PPO-Continuous")
         
 
         

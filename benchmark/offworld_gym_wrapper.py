@@ -10,8 +10,11 @@ import offworld_gym
 from offworld_gym.envs.common.channels import Channels
 from offworld_gym.envs.common.enums import AlgorithmMode, LearningType
 
+# from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnv, VecNormalize, VecMonitor
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnv, VecNormalize
+from stable_baselines3.common.utils import set_random_seed
+from stable_baselines3.common.evaluation import evaluate_policy
 
 
 class ImageToPyTorch(gym.ObservationWrapper):
@@ -32,8 +35,12 @@ def make_offworld_env(
                     env_name='OffWorldDockerMonolithDiscreteSim-v0',
                     env_type = 'sim', 
                     channel_type = 'DEPTH_ONLY', 
-                    mode='train',
-                    experiment_name='PPO'):
+                    mode = 'train',
+                    experiment_name = 'PPO',
+                    seed = 0,
+                    rank = 0,
+                    model_name = 'PPO-SIM-Discrete'
+                    ):
     """
     Create a wrapped function, monitored VecEnv for offworld gym.
     It is a wrapper around ``make_vec_env`` that includes common preprocessing for offworld gym.
@@ -47,42 +54,68 @@ def make_offworld_env(
     experiment_name: user cunstom experiment name.
 
     """
-    if env_type == 'sim':
-        if channel_type == 'DEPTH_ONLY':
-            return  gym.make(env_name, channel_type=Channels.DEPTH_ONLY)
-        elif channel_type == 'RGB':
-            return  gym.make(env_name, channel_type=Channels.RGB)
-        else:
-            return  gym.make(env_name, channel_type=Channels.RGBD)
-    else:
-        if channel_type == 'DEPTH_ONLY':
-            return  gym.make(env_name, channel_type=Channels.DEPTH_ONLY, resume_experiment=True,
-                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
-        elif channel_type == 'RGB':
-            return  gym.make(env_name, channel_type=Channels.RGB, resume_experiment=True,
-                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
-        else:
-            return  gym.make(env_name, channel_type=Channels.RGBD, resume_experiment=True,
-                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
+    set_random_seed(seed)
+    log_dir = "logs/" + model_name
+    
+    def _init_sim():
 
-def make_vec_env(make_env, num_envs, gamma):
+        if channel_type == 'DEPTH_ONLY':
+            env =   gym.make(env_name, channel_type=Channels.DEPTH_ONLY)
+        elif channel_type == 'RGB':
+            env =   gym.make(env_name, channel_type=Channels.RGB)
+        else:
+            env =   gym.make(env_name, channel_type=Channels.RGBD)
+
+        env = Monitor(env,log_dir)
+
+        # env.seed(seed + rank)
+
+        return env
+
+    def _init_real():
+
+        if channel_type == 'DEPTH_ONLY':
+            env =   gym.make(env_name, channel_type=Channels.DEPTH_ONLY, resume_experiment=True,
+                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
+        elif channel_type == 'RGB':
+            env =   gym.make(env_name, channel_type=Channels.RGB, resume_experiment=True,
+                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
+        else:
+            env =   gym.make(env_name, channel_type=Channels.RGBD, resume_experiment=True,
+                        learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
+        
+        env = Monitor(env,log_dir)
+        # env.seed(seed + rank)
+        return env
+
+    if env_type == 'sim':
+        return _init_sim()
+    else:
+        return _init_real()
+        
+
+def make_vec_env(make_offworld_env, num_envs):
 
     """
     Create a wrapped function, parallelize offworld gym.
 
     Args:
     make_env: function after making env.
-    num_envs: number of envvs to vectorize.
-    gamma: discount factor for future steps.
+    num_envs: number of envs to vectorize.
     """
-    envs = [make_env for i in range(num_envs)]
+
+    envs = [make_offworld_env for i in range(num_envs)] # the offworld env is already randomly init
+    # envs = [make_offworld_env(rank = i, log_dir=log_dir) for i in range(num_envs)]
 
     if num_envs == 1:
         envs = DummyVecEnv(envs)
     else:
         envs = SubprocVecEnv(envs)
 
-    envs = VecNormalize(envs, norm_obs=True, norm_reward=True)
+    # envvs = VecMonitor(envs,log_dir) # not yet support offworld gym
+
+    envs = VecNormalize(envs, norm_obs=True, norm_reward=False)
+    
 
 
     return envs
