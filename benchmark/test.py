@@ -14,6 +14,7 @@ import gym
 import offworld_gym
 from offworld_gym.envs.common.channels import Channels
 from offworld_gym.envs.common.enums import AlgorithmMode, LearningType
+from stable_baselines3.common.vec_env import VecVideoRecorder
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -47,6 +48,28 @@ def parser():
 
     return args
 
+def record_video(eval_ebv model, video_length=500, prefix='', video_folder='videos/'):
+  """
+  :param env_id: (str)
+  :param model: (RL model)
+  :param video_length: (int)
+  :param prefix: (str)
+  :param video_folder: (str)
+  """
+  
+  # Start the video at step=0 and record 500 steps
+  eval_env = VecVideoRecorder(eval_env, video_folder=video_folder,
+                              record_video_trigger=lambda step: step == 0, video_length=video_length,
+                              name_prefix=prefix)
+
+  obs = eval_env.reset()
+  for _ in range(video_length):
+    action, _ = model.predict(obs)
+    obs, _, _, _ = eval_env.step(action)
+
+  # Close the video recorder
+  eval_env.close()
+
 def main():
 
     # parse arguments
@@ -73,6 +96,11 @@ def main():
     
     print("===================Finished Testing===========================")
     print(f"Tested for {args.n_eval_episodes} episodes, mean_reward={mean_reward:.3f} +/- {std_reward}")
+
+    # visualize trained agent for simulator
+    video_length=500 
+    record_video(eval_env, agent, video_length=500, prefix=trained_model_name)
+
 
 if __name__ == "__main__":
     main()
