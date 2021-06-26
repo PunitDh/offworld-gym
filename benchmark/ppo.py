@@ -44,11 +44,11 @@ def parser():
     # parser.add_argument(
     #     '--model_name', default='PPO-SIM-Continuous', help='model name')
     parser.add_argument(
-        '--model_name', default='PPO-SIM-Discrete', help='model name')
+        '--model_name', default='PPO-REAL-Discrete', help='model name')
     parser.add_argument(
-        '--num_envs', type=int, default=6, help='num of parallel training envs in sim')
+        '--num_envs', type=int, default=1, help='num of parallel training envs in sim')
     parser.add_argument(
-        '--resume_folder', type=str, default=None, help='folder to resume training')
+        '--resume_model_path', type=str, default=None, help='folder to resume training')
     parser.add_argument(
         '--checkpoint_folder', default='checkpoints/', help='folder to store the checkpoint')
     parser.add_argument(
@@ -121,8 +121,9 @@ def main():
     # summary = SummaryWriter(logdir=log_folder)
 
     # build offworld envs
-    make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', model_name=args.model_name)
+    # make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', model_name=args.model_name)
     # make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', model_name=args.model_name)
+    make_offworld_env(env_name='OffWorldMonolithDiscreteReal-v0', model_name=args.model_name, env_type= 'real')
     train_env = make_vec_env(make_offworld_env, num_envs=args.num_envs)
     eval_env =  make_vec_env(make_offworld_env, num_envs=1)
     # env = VecFrameStack(env, n_stack=4)
@@ -136,9 +137,12 @@ def main():
     policy_kwargs["optimizer_class"] = RMSpropTFLike
     policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)
 
-    model = PPO("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, n_epochs=args.ppo_epoch,ent_coef=args.entropy_coef,
-                n_steps=args.num_steps,learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,clip_range=args.clip_param,
-                clip_range_vf=None, tensorboard_log=log_folder,device=device,verbose=1)
+    if not args.resume_model_path:
+        model = PPO("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, n_epochs=args.ppo_epoch,ent_coef=args.entropy_coef,
+                    n_steps=args.num_steps,learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,clip_range=args.clip_param,
+                    clip_range_vf=None, tensorboard_log=log_folder,device=device,verbose=1)
+    else:
+        model = PPO.load(args.resume_model_path)
 
     
     callback = EvalCallback(eval_env = eval_env,eval_freq=5000,log_path=log_folder,best_model_save_path=log_folder)

@@ -37,7 +37,7 @@ from typing import Callable
 def parser():
     parser = argparse.ArgumentParser(description='RL Algorithm')
     parser.add_argument(
-        '--trained_model_path', default='PPO-Continuous.zip', help='folder to store the checkpoint')
+        '--trained_model_path', default='PPO-Discrete.zip', help='folder to store the checkpoint')
     parser.add_argument(
         '--n_eval_episodes',type=int,default=20, help='number of ppo epochs (default: 4)')
     parser.add_argument(
@@ -57,7 +57,8 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # build offworld envs
-    make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0')
+    # make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0')
+    make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0')
     eval_env =  make_vec_env(make_offworld_env, num_envs=1)
 
     # load trained model

@@ -36,10 +36,10 @@ def make_offworld_env(
                     env_type = 'sim', 
                     channel_type = 'DEPTH_ONLY', 
                     mode = 'train',
-                    experiment_name = 'PPO',
+                    experiment_name = 'PPO-Discrete',
                     seed = 0,
                     rank = 0,
-                    model_name = 'PPO-SIM-Discrete'
+                    model_name = 'PPO-REAL-Discrete'
                     ):
     """
     Create a wrapped function, monitored VecEnv for offworld gym.
