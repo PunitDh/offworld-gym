@@ -5,6 +5,7 @@ __version__     = version.__version__
 import os
 os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
 os.environ['CUDA_VISIBLE_DEVICES']='0'
+
 import sys
 import time
 import numpy as np
@@ -14,7 +15,7 @@ import gym
 import offworld_gym
 from offworld_gym.envs.common.channels import Channels
 from offworld_gym.envs.common.enums import AlgorithmMode, LearningType
-from stable_baselines3.common.vec_env import VecVideoRecorder
+from stable_baselines3.common.vec_env import VecVideoRecorder,  DummyVecEnv
 
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,6 +24,7 @@ import torch.optim as optim
 import numpy as np
 import copy
 import argparse
+import cv2
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.policies import ActorCriticPolicy
@@ -34,6 +36,7 @@ from stable_baselines3.common.sb2_compat.rmsprop_tf_like import RMSpropTFLike
 from offworld_gym_wrapper import make_offworld_env, make_vec_env, ImageToPyTorch
 from custom_cnn_policy import CustomCNN
 from typing import Callable
+
 
 def parser():
     parser = argparse.ArgumentParser(description='RL Algorithm')
@@ -48,7 +51,7 @@ def parser():
 
     return args
 
-def record_video(eval_ebv model, video_length=500, prefix='', video_folder='videos/'):
+def record_video(eval_env, model, video_length=500, prefix='', video_folder='videos/'):
   """
   :param env_id: (str)
   :param model: (RL model)
@@ -56,7 +59,6 @@ def record_video(eval_ebv model, video_length=500, prefix='', video_folder='vide
   :param prefix: (str)
   :param video_folder: (str)
   """
-  
   # Start the video at step=0 and record 500 steps
   eval_env = VecVideoRecorder(eval_env, video_folder=video_folder,
                               record_video_trigger=lambda step: step == 0, video_length=video_length,
@@ -80,8 +82,10 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # build offworld envs
-    # make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0')
-    make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0')
+    env_name = 'OffWorldDockerMonolithDiscreteSim-v0'
+    # env_name = 'OffWorldDockerMonolithContinuousSim-v0'
+
+    make_offworld_env(env_name=env_name)
     eval_env =  make_vec_env(make_offworld_env, num_envs=1)
 
     # load trained model
@@ -90,16 +94,14 @@ def main():
 
     # Evaluate the trained agent
 
-    mean_reward, std_reward = evaluate_policy(agent, eval_env, n_eval_episodes=args.n_eval_episodes, deterministic=False)
+    mean_reward, std_reward = evaluate_policy(agent, eval_env, n_eval_episodes=args.n_eval_episodes, deterministic=True)
 
-    eval_env.close()  
     
-    print("===================Finished Testing===========================")
-    print(f"Tested for {args.n_eval_episodes} episodes, mean_reward={mean_reward:.3f} +/- {std_reward}")
+    print("===================Finished Testing===================")
+    print(f"Tested for {args.n_eval_episodes} episodes, mean_reward={mean_reward:.3f} +/- {std_reward:.3f}")
 
     # visualize trained agent for simulator
-    video_length=500 
-    record_video(eval_env, agent, video_length=500, prefix=trained_model_name)
+    # record_video(eval_env, agent, video_length=500, prefix=trained_model_name)
 
 
 if __name__ == "__main__":
