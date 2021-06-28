@@ -132,7 +132,7 @@ def main():
     policy_kwargs = dict(
                     features_extractor_class=CustomCNN,
                     features_extractor_kwargs=dict(features_dim=256),
-                    net_arch=[dict(vf=[64,64,32],pi=[64,64])],)
+                    net_arch=[dict(vf=[256,256],pi=[256,256])],)
 
     policy_kwargs["optimizer_class"] = RMSpropTFLike
     policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)

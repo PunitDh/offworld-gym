@@ -40,13 +40,13 @@ from typing import Callable
 
 
 def parser():
-    parser = argparse.ArgumentParser(description='PPO')
+    parser = argparse.ArgumentParser(description='SAC')
     parser.add_argument(
         '--model_name', default='SAC-SIM-Continuous', help='model name')
     # parser.add_argument(
     #     '--model_name', default='PPO-REAL-Discrete', help='model name')
     parser.add_argument(
-        '--num_envs', type=int, default=6, help='num of parallel training envs in sim')
+        '--num_envs', type=int, default=1, help='num of parallel training envs in sim')
     parser.add_argument(
         '--resume_model_path', type=str, default=None, help='folder to resume training')
     parser.add_argument(
@@ -68,13 +68,13 @@ def parser():
     parser.add_argument(
         '--num_steps',type=int, default=128, help='frequency of parameter update')
     parser.add_argument(
-        '--buffer_size',type=int,default=300000, help='number of ppo epochs (default: 4)')
+        '--buffer_size',type=int,default=20000, help='number of ppo epochs (default: 4)')
     parser.add_argument(
         '--num_mini_batch',type=int, default=64, help='number of batches for ppo (default: 32)')
     parser.add_argument(
         '--learning_starts',type=float,default=10000,help='ppo clip parameter (default: 0.2)')
     parser.add_argument(
-        '--num_env_steps', type=int, default=2.5e5, help='number of environment steps to train (default: 1e6)')
+        '--n_timesteps', type=int, default=2.5e5, help='number of environment steps to train (default: 1e6)')
     parser.add_argument(
         '--lr', type=int, default=7.3e-4, help='learning rate')
 
@@ -132,22 +132,22 @@ def main():
     policy_kwargs = dict(
                     features_extractor_class=CustomCNN,
                     features_extractor_kwargs=dict(features_dim=256),
-                    net_arch=[dict(vf=[64,64,32],pi=[64,64])],
+                    net_arch=[400,300],
                     log_std_init=-3)
 
     policy_kwargs["optimizer_class"] = RMSpropTFLike
     policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)
 
     if not args.resume_model_path:
-        model = PPO("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto',buffer_size=args.buffer_size,
-                    n_steps=args.num_steps,learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,gamma=args.gamma,
+        model = SAC("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto',buffer_size=args.buffer_size,
+                    learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,gamma=args.gamma,
                     tau=args.tau, learning_starts=args.learning_starts,tensorboard_log=log_folder,device=device,verbose=1)
     else:
-        model = PPO.load(args.resume_model_path)
+        model = SAC.load(args.resume_model_path)
 
     
     callback = EvalCallback(eval_env = eval_env,eval_freq=5000,log_path=log_folder,best_model_save_path=log_folder)
-    model.learn(args.num_env_steps,callback= callback)
+    model.learn(args.n_timesteps,callback= callback)
 
     # model.save("SAC-Discrete")
     model.save("SAC-Continuous")

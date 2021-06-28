@@ -30,16 +30,43 @@ class ImageToPyTorch(gym.ObservationWrapper):
                                 old_shape[1], old_shape[2]),
                                 dtype=np.float32)
 
+class WarpFrame(gym.ObservationWrapper):
+    """
+    Warp frames to a scale (default: 50%)
+    as done in the Nature paper and later work.
+    :param env: the environment
+    :param scale_percent: 50.
+    original oberservation shape [1,240,320,channnel]
+    """
+
+    def __init__(self, env: gym.Env,  scale_percent: int = 50):
+        gym.ObservationWrapper.__init__(self, env)
+        self.scale_percent = scale_percent
+        self.width = int(env.observation_space.shape[2] * scale_percent / 100)
+        self.height = int(env.observation_space.shape[1] * scale_percent / 100)
+        self.channel = env.observation_space.shape[3]
+        self.observation_space = spaces.Box(
+            low=0.0, high=255.0, shape=(1, self.height, self.width, self.channel), dtype=env.observation_space.dtype
+        )
+
+    def observation(self, frame: np.ndarray) -> np.ndarray:
+        """
+        returns the current observation from a frame
+        :param frame: environment frame
+        :return: the observation
+        """
+        frame = cv2.resize(frame[0], (self.width, self.height), interpolation=cv2.INTER_AREA)
+        return frame[None, :, :, :]
 
 def make_offworld_env(
-                    env_name='OffWorldDockerMonolithDiscreteSim-v0',
+                    env_name='OffWorldDockerMonolithContinuousSim-v0',
                     env_type = 'sim', 
                     channel_type = 'DEPTH_ONLY', 
                     mode = 'train',
-                    experiment_name = 'PPO-Discrete',
+                    experiment_name = 'SAC-Continuous',
                     seed = 0,
                     rank = 0,
-                    model_name = 'PPO-REAL-Discrete'
+                    model_name = 'SAC-SIM-Continuous'
                     ):
     """
     Create a wrapped function, monitored VecEnv for offworld gym.
@@ -66,7 +93,9 @@ def make_offworld_env(
         else:
             env =   gym.make(env_name, channel_type=Channels.RGBD)
 
+        env = WarpFrame(env)
         env = Monitor(env,log_dir)
+
 
         # env.seed(seed + rank)
 
@@ -84,6 +113,7 @@ def make_offworld_env(
             env =   gym.make(env_name, channel_type=Channels.RGBD, resume_experiment=True,
                         learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
         
+        env = WarpFrame(env)
         env = Monitor(env,log_dir)
         # env.seed(seed + rank)
         return env
@@ -116,7 +146,7 @@ def make_vec_env(make_offworld_env, num_envs):
 
     envs = VecNormalize(envs, norm_obs=True, norm_reward=False)
     
-
+    logging.info(f"action space: {envs.action_space} observation_space: {envs.observation_space}")
 
     return envs
 
