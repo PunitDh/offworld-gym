@@ -17,4 +17,9 @@ models/
 docs/_build
 
 benchmark/PPO-Continuous.zip
-benchmark/PPO-Discrete.zip
+benchmark/SAC-Continuous-0.1
+benchmark/SAC-Continuous-0.2
+benchmark/SAC-Continuous-0.05
+benchmark/SAC-Continuous-auto-0.2
+benchmark/SAC-Continuous-auto-0.25
+benchmark/TD3-Continuous.zip

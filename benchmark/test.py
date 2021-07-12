@@ -26,7 +26,7 @@ import copy
 import argparse
 import cv2
 
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, SAC, TD3
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.vec_env import VecFrameStack
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -41,9 +41,9 @@ from typing import Callable
 def parser():
     parser = argparse.ArgumentParser(description='RL Algorithm')
     parser.add_argument(
-        '--trained_model_path', default='PPO-Discrete.zip', help='folder to store the checkpoint')
+        '--trained_model_path', default='SAC-Continuous-auto-0.2.zip', help='folder to store the checkpoint')
     parser.add_argument(
-        '--n_eval_episodes',type=int,default=20, help='number of ppo epochs (default: 4)')
+        '--n_eval_episodes',type=int,default=100, help='number of ppo epochs (default: 4)')
     parser.add_argument(
         '--real', action='store_true', help='true if test in real robot')
     args = parser.parse_args()
@@ -82,23 +82,25 @@ def main():
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # build offworld envs
-    env_name = 'OffWorldDockerMonolithDiscreteSim-v0'
-    # env_name = 'OffWorldDockerMonolithContinuousSim-v0'
+    # env_name = 'OffWorldDockerMonolithDiscreteSim-v0'
+    env_name = 'OffWorldDockerMonolithContinuousSim-v0'
 
     make_offworld_env(env_name=env_name)
     eval_env =  make_vec_env(make_offworld_env, num_envs=1)
 
     # load trained model
-    trained_model_name = args.trained_model_path.split(".")[0]
-    agent = PPO.load(trained_model_name)
+    rl_model = SAC
+    trained_model_name = args.trained_model_path.replace(".zip","")
+    agent = rl_model.load(trained_model_name)
 
     # Evaluate the trained agent
-
+    print("===================Start Evaluating===================")
+    print(f"Evaluating {trained_model_name} on {env_name} environment.")
     mean_reward, std_reward = evaluate_policy(agent, eval_env, n_eval_episodes=args.n_eval_episodes, deterministic=True)
 
     
-    print("===================Finished Testing===================")
-    print(f"Tested for {args.n_eval_episodes} episodes, mean_reward={mean_reward:.3f} +/- {std_reward:.3f}")
+    print("===================Finished Evaluating===================")
+    print(f"Evaluated for {args.n_eval_episodes} episodes, mean_reward={mean_reward:.3f} +/- {std_reward:.3f}")
 
     # visualize trained agent for simulator
     # record_video(eval_env, agent, video_length=500, prefix=trained_model_name)

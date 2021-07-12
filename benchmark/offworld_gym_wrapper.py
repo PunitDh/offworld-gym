@@ -5,6 +5,7 @@ from gym import spaces
 import numpy as np
 from multiprocessing import Process, Pipe
 from typing import Any, Callable, Dict, Optional, Type, Union
+import cv2
 
 import offworld_gym
 from offworld_gym.envs.common.channels import Channels
@@ -39,12 +40,17 @@ class WarpFrame(gym.ObservationWrapper):
     original oberservation shape [1,240,320,channnel]
     """
 
-    def __init__(self, env: gym.Env,  scale_percent: int = 50):
+    def __init__(self, env: gym.Env,  scale_percent: int = 50, fixed : str = True):
         gym.ObservationWrapper.__init__(self, env)
-        self.scale_percent = scale_percent
-        self.width = int(env.observation_space.shape[2] * scale_percent / 100)
-        self.height = int(env.observation_space.shape[1] * scale_percent / 100)
-        self.channel = env.observation_space.shape[3]
+        if fixed:
+            self.width = 84
+            self.height = 84
+            self.channel = env.observation_space.shape[3]
+        else:
+            self.scale_percent = scale_percent
+            self.width = int(env.observation_space.shape[2] * scale_percent / 100)
+            self.height = int(env.observation_space.shape[1] * scale_percent / 100)
+            self.channel = env.observation_space.shape[3]
         self.observation_space = spaces.Box(
             low=0.0, high=255.0, shape=(1, self.height, self.width, self.channel), dtype=env.observation_space.dtype
         )
@@ -56,7 +62,10 @@ class WarpFrame(gym.ObservationWrapper):
         :return: the observation
         """
         frame = cv2.resize(frame[0], (self.width, self.height), interpolation=cv2.INTER_AREA)
-        return frame[None, :, :, :]
+        if self.channel == 1:
+            return frame[None, :, :, None]
+        else:
+            return frame[None, :, :, :]
 
 def make_offworld_env(
                     env_name='OffWorldDockerMonolithContinuousSim-v0',

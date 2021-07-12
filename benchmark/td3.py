@@ -26,7 +26,7 @@ import argparse
 from tensorboardX import SummaryWriter
 
 
-from stable_baselines3 import SAC
+from stable_baselines3 import TD3
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.vec_env import VecFrameStack
 from stable_baselines3.common.callbacks import EvalCallback
@@ -43,9 +43,9 @@ from typing import Callable
 def parser():
     parser = argparse.ArgumentParser(description='SAC')
     parser.add_argument(
-        '--model_name', default='SAC-SIM-Continuous', help='model name')
+        '--model_name', default='TD3-SIM-Continuous', help='model name')
     # parser.add_argument(
-    #     '--model_name', default='PPO-REAL-Discrete', help='model name')
+    #     '--model_name', default='TD3-REAL-Discrete', help='model name')
     parser.add_argument(
         '--num_envs', type=int, default=1, help='num of parallel training envs in sim')
     parser.add_argument(
@@ -53,17 +53,15 @@ def parser():
     parser.add_argument(
         '--checkpoint_folder', default='checkpoints/', help='folder to store the checkpoint')
     parser.add_argument(
-        '--model_saved_name', default='SAC-Continuous-0.05', help='folder to store the checkpoint')
-    parser.add_argument(
         '--log_interval', type=int, default=1, help='log interval, one log per n updates (default: 1)')
     parser.add_argument(
         '--save_interval', type=int, default=20, help='save interval, one save per n updates (default: 10)')
     parser.add_argument(
         '--gamma', type=float, default=0.98, help='eposodic discounted coef gamma(default: 0.99)')
     parser.add_argument(
-        '--tau',type=float, default=0.02, help='Adam optimizer epsilon (default: 1e-5)')
+        '--tau',type=float, default=5e-3, help='Adam optimizer epsilon (default: 1e-5)')
     parser.add_argument(
-        '--entropy_coef', type=str, default="auto_0.2", help='entropy term coefficient (default: 0.01)')
+        '--entropy_coef', type=float, default=0.01, help='entropy term coefficient (default: 0.01)')
     parser.add_argument(
         '--value_loss_coef', type=float, default=0.5, help='value loss coefficient (default: 0.5)')
     parser.add_argument( 
@@ -71,15 +69,15 @@ def parser():
     parser.add_argument(
         '--num_steps',type=int, default=128, help='frequency of parameter update')
     parser.add_argument(
-        '--buffer_size',type=int,default=20000, help='number of ppo epochs (default: 4)')
+        '--buffer_size',type=int,default=50000, help='number of ppo epochs (default: 4)')
     parser.add_argument(
-        '--num_mini_batch',type=int, default=64, help='number of batches for ppo (default: 32)')
+        '--num_mini_batch',type=int, default=256, help='number of batches for ppo (default: 32)')
     parser.add_argument(
-        '--learning_starts',type=float,default=10000,help='ppo clip parameter (default: 0.2)')
+        '--learning_starts',type=float,default=100,help='ppo clip parameter (default: 0.2)')
     parser.add_argument(
         '--n_timesteps', type=int, default=2.5e5, help='number of environment steps to train (default: 1e6)')
     parser.add_argument(
-        '--lr', type=int, default=7.3e-4, help='learning rate')
+        '--lr', type=int, default=1e-3, help='learning rate')
 
     parser.add_argument(
         '--no_cuda', action='store_true', help='debug without cuda')
@@ -136,25 +134,29 @@ def main():
                     features_extractor_class=CustomCNN,
                     features_extractor_kwargs=dict(features_dim=256),
                     net_arch=[64,64],
-                    log_std_init=-3)
+                    )
 
     policy_kwargs["optimizer_class"] = RMSpropTFLike
     policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)
 
+    # The noise objects for TD3
+    n_actions = train_env.action_space.shape[-1]
+    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
+
     if not args.resume_model_path:
-        model = SAC("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.25',buffer_size=args.buffer_size,
-                    learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,gamma=args.gamma, gradient_steps=-1,
-                    action_noise=NormalActionNoise(np.array([0,0]), np.array([0.1,0.1])),
+        model = TD3("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, buffer_size=args.buffer_size, train_freq=1,
+                    learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,gamma=args.gamma, 
+                    action_noise=action_noise, optimize_memory_usage=True, gradient_steps=-1,
                     tau=args.tau, learning_starts=args.learning_starts,tensorboard_log=log_folder,device=device,verbose=1)
     else:
-        model = SAC.load(args.resume_model_path)
+        model = TD3.load(args.resume_model_path)
 
     
     callback = EvalCallback(eval_env = eval_env,eval_freq=5000,log_path=log_folder,best_model_save_path=log_folder)
     model.learn(args.n_timesteps,callback= callback)
 
-    # model.save("SAC-Discrete")
-    model.save(args.model_saved_name)
+    # model.save("TD3-Discrete")
+    model.save("TD3-Continuous")
         
 
         
