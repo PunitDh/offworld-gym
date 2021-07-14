@@ -24,26 +24,28 @@ import shutil
 import copy
 import argparse
 from tensorboardX import SummaryWriter
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning) # to surpress the warning when running real env
+
 
 
 from stable_baselines3 import SAC
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.vec_env import VecFrameStack
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
 from stable_baselines3.common.sb2_compat.rmsprop_tf_like import RMSpropTFLike
 from stable_baselines3.common.noise import NormalActionNoise
 
 
 from offworld_gym_wrapper import make_offworld_env, make_vec_env, ImageToPyTorch
 from custom_cnn_policy import CustomCNN
-from callback import SaveOnBestTrainingRewardCallback
 from typing import Callable
 
 
 def parser():
     parser = argparse.ArgumentParser(description='SAC')
     parser.add_argument(
-        '--model_name', default='SAC-SIM-Continuous', help='model name')
+        '--model_name', default='SAC-REAL-Continuous', help='model name')
     # parser.add_argument(
     #     '--model_name', default='PPO-REAL-Discrete', help='model name')
     parser.add_argument(
@@ -53,7 +55,7 @@ def parser():
     parser.add_argument(
         '--checkpoint_folder', default='checkpoints/', help='folder to store the checkpoint')
     parser.add_argument(
-        '--model_saved_name', default='SAC-Continuous-0.05', help='folder to store the checkpoint')
+        '--model_saved_name', default='SAC-REAL-Continuous', help='folder to store the checkpoint')
     parser.add_argument(
         '--log_interval', type=int, default=1, help='log interval, one log per n updates (default: 1)')
     parser.add_argument(
@@ -71,11 +73,11 @@ def parser():
     parser.add_argument(
         '--num_steps',type=int, default=128, help='frequency of parameter update')
     parser.add_argument(
-        '--buffer_size',type=int,default=20000, help='number of ppo epochs (default: 4)')
+        '--buffer_size',type=int,default=20000, help='number of transition tuples in buffer (default: 20000)')
     parser.add_argument(
-        '--num_mini_batch',type=int, default=64, help='number of batches for ppo (default: 32)')
+        '--num_mini_batch',type=int, default=64, help='number of batches for sac (default: 32)')
     parser.add_argument(
-        '--learning_starts',type=float,default=10000,help='ppo clip parameter (default: 0.2)')
+        '--learning_starts',type=float,default=500,help='learning starts at n steps (default: 1000)')
     parser.add_argument(
         '--n_timesteps', type=int, default=2.5e5, help='number of environment steps to train (default: 1e6)')
     parser.add_argument(
@@ -125,8 +127,8 @@ def main():
 
     # build offworld envs
     # make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', model_name=args.model_name)
-    make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', model_name=args.model_name)
-    # make_offworld_env(env_name='OffWorldMonolithDiscreteReal-v0', model_name=args.model_name, env_type= 'real')
+    # make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', model_name=args.model_name)
+    make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', model_name=args.model_name, env_type= 'real')
     train_env = make_vec_env(make_offworld_env, num_envs=args.num_envs)
     eval_env =  make_vec_env(make_offworld_env, num_envs=1)
     # env = VecFrameStack(env, n_stack=4)
@@ -142,7 +144,7 @@ def main():
     policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)
 
     if not args.resume_model_path:
-        model = SAC("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.25',buffer_size=args.buffer_size,
+        model = SAC("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.2',buffer_size=args.buffer_size,
                     learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,gamma=args.gamma, gradient_steps=-1,
                     action_noise=NormalActionNoise(np.array([0,0]), np.array([0.1,0.1])),
                     tau=args.tau, learning_starts=args.learning_starts,tensorboard_log=log_folder,device=device,verbose=1)
@@ -150,7 +152,8 @@ def main():
         model = SAC.load(args.resume_model_path)
 
     
-    callback = EvalCallback(eval_env = eval_env,eval_freq=5000,log_path=log_folder,best_model_save_path=log_folder)
+    # callback = EvalCallback(eval_env = eval_env,eval_freq=250,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
+    callback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback for real env
     model.learn(args.n_timesteps,callback= callback)
 
     # model.save("SAC-Discrete")

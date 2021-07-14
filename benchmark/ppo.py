@@ -24,18 +24,19 @@ import shutil
 import copy
 import argparse
 from tensorboardX import SummaryWriter
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning) # to surpress the warning when running real env
 
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.vec_env import VecFrameStack
-from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
 from stable_baselines3.common.sb2_compat.rmsprop_tf_like import RMSpropTFLike
 
 
 from offworld_gym_wrapper import make_offworld_env, make_vec_env, ImageToPyTorch
 from custom_cnn_policy import CustomCNN
-from callback import SaveOnBestTrainingRewardCallback
 from typing import Callable
 
 
@@ -49,6 +50,8 @@ def parser():
         '--num_envs', type=int, default=1, help='num of parallel training envs in sim')
     parser.add_argument(
         '--resume_model_path', type=str, default=None, help='folder to resume training')
+    parser.add_argument(
+        '--model_saved_name', default='PPO-REAL-Discrete.zip', help='folder to store the checkpoint')
     parser.add_argument(
         '--checkpoint_folder', default='checkpoints/', help='folder to store the checkpoint')
     parser.add_argument(
@@ -123,7 +126,7 @@ def main():
     # build offworld envs
     # make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', model_name=args.model_name)
     # make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', model_name=args.model_name)
-    make_offworld_env(env_name='OffWorldMonolithDiscreteReal-v0', model_name=args.model_name, env_type= 'real')
+    make_offworld_env(env_name='OffWorldMonolithDiscreteReal-v0', model_name=args.model_name, env_type= 'real', experiment_name="PPO-DISCRETE")
     train_env = make_vec_env(make_offworld_env, num_envs=args.num_envs)
     eval_env =  make_vec_env(make_offworld_env, num_envs=1)
     # env = VecFrameStack(env, n_stack=4)
@@ -145,11 +148,13 @@ def main():
         model = PPO.load(args.resume_model_path)
 
     
-    callback = EvalCallback(eval_env = eval_env,eval_freq=5000,log_path=log_folder,best_model_save_path=log_folder)
+    # callback = EvalCallback(eval_env = eval_env,eval_freq=1000,log_path=log_folder,best_model_save_path=log_folder)
+    callback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback
     model.learn(args.num_env_steps,callback= callback)
 
-    model.save("PPO-Discrete")
+    # model.save("PPO-Discrete")
     # model.save("PPO-Continuous")
+    model.save(args.model_saved_name)
         
 
         

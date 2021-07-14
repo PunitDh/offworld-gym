@@ -68,14 +68,15 @@ class WarpFrame(gym.ObservationWrapper):
             return frame[None, :, :, :]
 
 def make_offworld_env(
-                    env_name='OffWorldDockerMonolithContinuousSim-v0',
-                    env_type = 'sim', 
+                    env_name='OffWorldMonolithContinuousReal-v0',
+                    env_type = 'real', 
                     channel_type = 'DEPTH_ONLY', 
                     mode = 'train',
-                    experiment_name = 'SAC-Continuous',
+                    experiment_name = 'SAC-REAL-Continuous-1',
+                    model_name = 'SAC-REAL-Continuous',
                     seed = 0,
                     rank = 0,
-                    model_name = 'SAC-SIM-Continuous'
+                    resume = True,
                     ):
     """
     Create a wrapped function, monitored VecEnv for offworld gym.
@@ -113,13 +114,13 @@ def make_offworld_env(
     def _init_real():
 
         if channel_type == 'DEPTH_ONLY':
-            env =   gym.make(env_name, channel_type=Channels.DEPTH_ONLY, resume_experiment=True,
+            env =   gym.make(env_name, channel_type=Channels.DEPTH_ONLY, resume_experiment=resume,
                         learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
         elif channel_type == 'RGB':
-            env =   gym.make(env_name, channel_type=Channels.RGB, resume_experiment=True,
+            env =   gym.make(env_name, channel_type=Channels.RGB, resume_experiment=resume,
                         learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
         else:
-            env =   gym.make(env_name, channel_type=Channels.RGBD, resume_experiment=True,
+            env =   gym.make(env_name, channel_type=Channels.RGBD, resume_experiment=resume,
                         learning_type=LearningType.END_TO_END, algorithm_mode=AlgorithmMode.TRAIN, experiment_name=experiment_name)
         
         env = WarpFrame(env)
