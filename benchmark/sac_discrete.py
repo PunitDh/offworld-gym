@@ -36,6 +36,8 @@ from stable_baselines3.common.callbacks import EvalCallback, CheckpointCallback
 from stable_baselines3.common.sb2_compat.rmsprop_tf_like import RMSpropTFLike
 from stable_baselines3.common.noise import NormalActionNoise
 
+from sac_discrete import SACDiscrete
+
 
 from offworld_gym_wrapper import make_offworld_env, make_vec_env, ImageToPyTorch
 from custom_cnn_policy import CustomCNN
@@ -44,10 +46,10 @@ from typing import Callable
 
 def parser():
     parser = argparse.ArgumentParser(description='SAC')
-    parser.add_argument(
-        '--model_name', default='SAC-REAL-Continuous', help='model name')
     # parser.add_argument(
-    #     '--model_name', default='PPO-REAL-Discrete', help='model name')
+    #     '--model_name', default='SAC-REAL-Continuous', help='model name')
+    parser.add_argument(
+        '--model_name', default='SAC-SIM-Discrete', help='model name')
     parser.add_argument(
         '--num_envs', type=int, default=1, help='num of parallel training envs in sim')
     parser.add_argument(
@@ -55,7 +57,7 @@ def parser():
     parser.add_argument(
         '--checkpoint_folder', default='checkpoints/', help='folder to store the checkpoint')
     parser.add_argument(
-        '--model_saved_name', default='SAC-REAL-Continuous', help='folder to store the checkpoint')
+        '--model_saved_name', default='SAC-SIM-Discrete', help='folder to store the checkpoint')
     parser.add_argument(
         '--log_interval', type=int, default=1, help='log interval, one log per n updates (default: 1)')
     parser.add_argument(
@@ -123,17 +125,15 @@ def main():
     log_folder = "logs/" + args.model_name
     # if not os.path.exists(checkpoint_folder): os.makedirs(checkpoint_folder)
     if not os.path.exists(log_folder): os.makedirs(log_folder)
-    # summary = SummaryWriter(logdir=log_folder)
 
     # build offworld envs
-
-    # make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', model_name=args.model_name)
-    # make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', model_name=args.model_name)
+    # make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', channel_type = 'DEPTH_ONLY', model_name=args.model_name, env_type= 'sim')
+    # make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', model_name=args.model_name, env_type= 'sim')
     # make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', model_name=args.model_name, env_type= 'real')
-    train_env = make_vec_env(make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', 
-                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-1',env_type= 'real'), num_envs=args.num_envs)
-    eval_env =  make_vec_env(make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', 
-                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-1', env_type= 'real'), num_envs=1)
+    train_env = make_vec_env(make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0',
+                 channel_type = 'DEPTH_ONLY', model_name=args.model_name, env_type= 'sim'), num_envs=args.num_envs)
+    eval_env =  make_vec_env(make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', 
+                channel_type = 'DEPTH_ONLY', model_name=args.model_name, env_type= 'sim'), num_envs=1)
     # env = VecFrameStack(env, n_stack=4)
 
     # initailize PPO agent
@@ -146,26 +146,21 @@ def main():
     policy_kwargs["optimizer_class"] = RMSpropTFLike
     policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)
 
-    # callback = EvalCallback(eval_env = eval_env,eval_freq=250,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
-    callback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback for real env
-
     if not args.resume_model_path:
-        model = SAC("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.2',buffer_size=args.buffer_size,
+        model = SACDiscrete("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.2',buffer_size=args.buffer_size,
                     learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,gamma=args.gamma, gradient_steps=-1,
                     action_noise=NormalActionNoise(np.array([0,0]), np.array([0.1,0.1])),
                     tau=args.tau, learning_starts=args.learning_starts,tensorboard_log=log_folder,device=device,verbose=1)
-        
     else:
         print(f"loading previous model {args.resume_model_path}")
         model = SAC.load(os.path.join(log_folder, args.resume_model_path))
         model.set_env(train_env)
-        
-    model.learn(args.n_timesteps,callback= callback) 
-
 
     
- 
-    
+    callback = EvalCallback(eval_env = eval_env,eval_freq=1000,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
+    # callback = CheckpointCallback(save_freq=1000, save_path=log_folder) # checkpoint callback for real env
+    model.learn(args.n_timesteps,callback= callback)
+
     # model.save("SAC-Discrete")
     model.save(args.model_saved_name)
         

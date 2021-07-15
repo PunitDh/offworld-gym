@@ -68,12 +68,11 @@ class WarpFrame(gym.ObservationWrapper):
             return frame[None, :, :, :]
 
 def make_offworld_env(
-                    env_name='OffWorldMonolithContinuousReal-v0',
-                    env_type = 'real', 
-                    channel_type = 'DEPTH_ONLY', 
-                    mode = 'train',
-                    experiment_name = 'SAC-REAL-Continuous-1',
-                    model_name = 'SAC-REAL-Continuous',
+                    env_name,
+                    env_type, 
+                    channel_type='DEPTH_ONLY', 
+                    experiment_name=None,
+                    model_name=None,
                     seed = 0,
                     rank = 0,
                     resume = True,
@@ -91,11 +90,12 @@ def make_offworld_env(
     experiment_name: user cunstom experiment name.
 
     """
+    # print(f"env_name: {env_name}, env type: {env_type} ")
+
     set_random_seed(seed)
     log_dir = "logs/" + model_name
     
-    def _init_sim():
-
+    def _init_sim(env_name,channel_type,log_dir):
         if channel_type == 'DEPTH_ONLY':
             env =   gym.make(env_name, channel_type=Channels.DEPTH_ONLY)
         elif channel_type == 'RGB':
@@ -111,7 +111,7 @@ def make_offworld_env(
 
         return env
 
-    def _init_real():
+    def _init_real(env_name,channel_type, resume, experiment_name, log_dir):
 
         if channel_type == 'DEPTH_ONLY':
             env =   gym.make(env_name, channel_type=Channels.DEPTH_ONLY, resume_experiment=resume,
@@ -128,11 +128,15 @@ def make_offworld_env(
         # env.seed(seed + rank)
         return env
 
+    
+
     if env_type == 'sim':
-        return _init_sim()
+        return _init_sim(env_name,channel_type,log_dir)
+    elif env_type == 'real':
+        return _init_real(env_name,channel_type, resume, experiment_name, log_dir)
     else:
-        return _init_real()
-        
+        print("oops, please change env_type to sim or real.")
+
 
 def make_vec_env(make_offworld_env, num_envs):
 
@@ -144,8 +148,7 @@ def make_vec_env(make_offworld_env, num_envs):
     num_envs: number of envs to vectorize.
     """
 
-    envs = [make_offworld_env for i in range(num_envs)] # the offworld env is already randomly init
-    # envs = [make_offworld_env(rank = i, log_dir=log_dir) for i in range(num_envs)]
+    envs = [lambda : make_offworld_env for i in range(num_envs)] # the offworld env is already randomly init
 
     if num_envs == 1:
         envs = DummyVecEnv(envs)

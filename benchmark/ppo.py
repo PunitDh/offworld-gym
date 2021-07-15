@@ -145,7 +145,9 @@ def main():
                     n_steps=args.num_steps,learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,clip_range=args.clip_param,
                     clip_range_vf=None, tensorboard_log=log_folder,device=device,verbose=1)
     else:
-        model = PPO.load(args.resume_model_path)
+        print(f"loading previous model {args.resume_model_path}")
+        model = SAC.load(os.path.join(log_folder, args.resume_model_path))
+        model.set_env(train_env)
 
     
     # callback = EvalCallback(eval_env = eval_env,eval_freq=1000,log_path=log_folder,best_model_save_path=log_folder)
