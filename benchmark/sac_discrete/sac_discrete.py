@@ -1,3 +1,5 @@
+# This script is modified from https://github.com/DLR-RM/stable-baselines3/blob/master/stable_baselines3/sac/sac.py
+# and based on SOFTACTOR-CRITIC FORDISCRETEACTIONSETTINGS: https://arxiv.org/pdf/1910.07207.pdf
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import gym
@@ -5,6 +7,7 @@ import numpy as np
 import torch as th
 from torch.nn import functional as F
 
+from stable_baselines3.common import logger
 from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.noise import ActionNoise
 from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
@@ -226,7 +229,7 @@ class SACDiscrete(OffPolicyAlgorithm):
                 # Select action according to policy
                 next_actions, next_log_prob = self.actor.action_log_prob(replay_data.next_observations)
                 # Compute the next Q values: min over all critics targets
-                next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions), dim=1)
+                next_q_values = th.cat(self.critic_target(replay_data.next_observations, next_actions.unsqueeze(1)), dim=1)
                 next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
                 # add entropy term
                 next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
@@ -235,6 +238,7 @@ class SACDiscrete(OffPolicyAlgorithm):
 
             # Get current Q-values estimates for each critic network
             # using action from the replay buffer
+
             current_q_values = self.critic(replay_data.observations, replay_data.actions)
 
             # Compute critic loss
@@ -249,7 +253,9 @@ class SACDiscrete(OffPolicyAlgorithm):
             # Compute actor loss
             # Alternative: actor_loss = th.mean(log_prob - qf1_pi)
             # Mean over all critic networks
-            q_values_pi = th.cat(self.critic.forward(replay_data.observations, actions_pi), dim=1)
+            # print("obs shape:", replay_data.next_observations.shape)
+            # print("act shape:", actions_pi.unsqueeze(1).shape)
+            q_values_pi = th.cat(self.critic.forward(replay_data.observations, actions_pi.unsqueeze(1)), dim=1)
             min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
             actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
             actor_losses.append(actor_loss.item())
@@ -265,12 +271,12 @@ class SACDiscrete(OffPolicyAlgorithm):
 
         self._n_updates += gradient_steps
 
-        self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
-        self.logger.record("train/ent_coef", np.mean(ent_coefs))
-        self.logger.record("train/actor_loss", np.mean(actor_losses))
-        self.logger.record("train/critic_loss", np.mean(critic_losses))
+        logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
+        logger.record("train/ent_coef", np.mean(ent_coefs))
+        logger.record("train/actor_loss", np.mean(actor_losses))
+        logger.record("train/critic_loss", np.mean(critic_losses))
         if len(ent_coef_losses) > 0:
-            self.logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
+            logger.record("train/ent_coef_loss", np.mean(ent_coef_losses))
 
     def learn(
         self,
