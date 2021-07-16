@@ -121,7 +121,10 @@ class Actor(BasePolicy):
             # and the final actor layer must be softmax
 
             self.action_dist = CategoricalDistribution(action_dim)
+            # self.action_net = self.action_dist.proba_distribution_net(latent_dim=last_layer_dim).append(nn.SoftMax(dim=1))
             self.action_net = self.action_dist.proba_distribution_net(latent_dim=last_layer_dim)
+                                            
+    
 
 
 
@@ -213,9 +216,10 @@ class Actor(BasePolicy):
 
     def action_log_prob(self, obs: th.Tensor) -> Tuple[th.Tensor, th.Tensor]:
         # mean_actions, log_std, kwargs = self.get_action_dist_params(obs)
-        # # return action and associated log prob
         # return self.action_dist.log_prob_from_params(mean_actions, log_std, **kwargs)
+        
         action_logits, kwargs = self.get_action_dist_params(obs)
+        # # return action and associated log prob
         return self.action_dist.log_prob_from_params(action_logits, **kwargs)
 
 

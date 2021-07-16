@@ -63,7 +63,7 @@ def parser():
     parser.add_argument(
         '--gamma', type=float, default=0.98, help='eposodic discounted coef gamma(default: 0.99)')
     parser.add_argument(
-        '--tau',type=float, default=0.02, help='Adam optimizer epsilon (default: 1e-5)')
+        '--tau',type=float, default=0.005, help='Adam optimizer epsilon (default: 1e-5)')
     parser.add_argument(
         '--entropy_coef', type=str, default="auto_0.2", help='entropy term coefficient (default: 0.01)')
     parser.add_argument(
@@ -73,15 +73,15 @@ def parser():
     parser.add_argument(
         '--num_steps',type=int, default=128, help='frequency of parameter update')
     parser.add_argument(
-        '--buffer_size',type=int,default=20000, help='number of transition tuples in buffer (default: 20000)')
+        '--buffer_size',type=int,default=30000, help='number of transition tuples in buffer (default: 20000)')
     parser.add_argument(
         '--num_mini_batch',type=int, default=64, help='number of batches for sac (default: 32)')
     parser.add_argument(
-        '--learning_starts',type=float,default=500,help='learning starts at n steps (default: 1000)')
+        '--learning_starts',type=float,default=1500,help='learning starts at n steps (default: 1000)')
     parser.add_argument(
         '--n_timesteps', type=int, default=2.5e5, help='number of environment steps to train (default: 1e6)')
     parser.add_argument(
-        '--lr', type=int, default=7.3e-4, help='learning rate')
+        '--lr', type=int, default=3e-4, help='learning rate')
 
     parser.add_argument(
         '--no_cuda', action='store_true', help='debug without cuda')
@@ -116,7 +116,7 @@ def main():
     # setting cuda env
     torch.manual_seed(42)  # universal  magic number 42
     torch.cuda.manual_seed_all(42)
-    device = torch.device("cpu" if args.no_cuda else "cuda:0")
+    device = torch.device("cpu" if args.no_cuda else "cuda:1")
 
     # setting folder and logger
     # checkpoint_folder = os.path.join(args.checkpoint_folder, args.model_name)
@@ -126,14 +126,14 @@ def main():
     # summary = SummaryWriter(logdir=log_folder)
 
     # build offworld envs
-
-    # make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', model_name=args.model_name)
-    # make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', model_name=args.model_name)
-    # make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', model_name=args.model_name, env_type= 'real')
+    # env_name list: ['OffWorldDockerMonolithDiscreteSim-v0','OffWorldDockerMonolithContinuousSim-v0',
+    #                  'OffWorldMonolithDiscreteReal-v0','OffWorldMonolithContinuousReal-v0']
+    
+    # example for real env
     train_env = make_vec_env(make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', 
-                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-1',env_type= 'real'), num_envs=args.num_envs)
+                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-3',env_type= 'real', resume=True), num_envs=args.num_envs)
     eval_env =  make_vec_env(make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', 
-                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-1', env_type= 'real'), num_envs=1)
+                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-3', env_type= 'real',resume=True), num_envs=1)
     # env = VecFrameStack(env, n_stack=4)
 
     # initailize PPO agent
@@ -159,7 +159,7 @@ def main():
         print(f"loading previous model {args.resume_model_path}")
         model = SAC.load(os.path.join(log_folder, args.resume_model_path))
         model.set_env(train_env)
-        
+
     model.learn(args.n_timesteps,callback= callback) 
 
 

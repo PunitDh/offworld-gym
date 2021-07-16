@@ -203,15 +203,18 @@ class SACDiscrete(OffPolicyAlgorithm):
             # Action by the current actor for the sampled state
             actions_pi, log_prob = self.actor.action_log_prob(replay_data.observations)
             log_prob = log_prob.reshape(-1, 1)
-            # actions_pi = actions_pi.long()
-
+            action_prob = th.exp(log_prob)
+            # action_prob_clone = action_prob.clone().detach() # for entropy coef calculation, since it may need to detach 
             ent_coef_loss = None
             if self.ent_coef_optimizer is not None:
-                # Important: detach the variable from the graph
+                # Important: detach the variable from the graph(not sure about the detach, since we will reuse some vars)
                 # so we don't change it with other losses
                 # see https://github.com/rail-berkeley/softlearning/issues/60
+                # ent_coef = th.exp(self.log_ent_coef.detach())
+                # ent_coef_loss = (-(self.log_ent_coef * (log_prob + self.target_entropy)).detach()).mean()
                 ent_coef = th.exp(self.log_ent_coef.detach())
-                ent_coef_loss = -(self.log_ent_coef * (log_prob + self.target_entropy).detach()).mean()
+                ent_coef_loss = -(self.log_ent_coef * (-th.sum(log_prob * action_prob, dim=1, keepdim=True) + self.target_entropy).detach()).mean()
+
                 ent_coef_losses.append(ent_coef_loss.item())
             else:
                 ent_coef = self.ent_coef_tensor
@@ -233,6 +236,9 @@ class SACDiscrete(OffPolicyAlgorithm):
                 next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
                 # add entropy term
                 next_q_values = next_q_values - ent_coef * next_log_prob.reshape(-1, 1)
+                # based on paper, next Q-value estmation should include the action probabilities
+                next_action_prob = next_log_prob.reshape(-1, 1).exp()
+                next_q_values  *= next_action_prob
                 # td error + entropy term
                 target_q_values = replay_data.rewards + (1 - replay_data.dones) * self.gamma * next_q_values
 
@@ -256,8 +262,8 @@ class SACDiscrete(OffPolicyAlgorithm):
             # print("obs shape:", replay_data.next_observations.shape)
             # print("act shape:", actions_pi.unsqueeze(1).shape)
             q_values_pi = th.cat(self.critic.forward(replay_data.observations, actions_pi.unsqueeze(1)), dim=1)
-            min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)
-            actor_loss = (ent_coef * log_prob - min_qf_pi).mean()
+            min_qf_pi, _ = th.min(q_values_pi, dim=1, keepdim=True)  
+            actor_loss = ((ent_coef * log_prob - min_qf_pi) * action_prob).mean()
             actor_losses.append(actor_loss.item())
 
             # Optimize the actor

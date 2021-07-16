@@ -65,7 +65,7 @@ def parser():
     parser.add_argument(
         '--gamma', type=float, default=0.98, help='eposodic discounted coef gamma(default: 0.99)')
     parser.add_argument(
-        '--tau',type=float, default=0.02, help='Adam optimizer epsilon (default: 1e-5)')
+        '--tau',type=float, default=0.005, help='Adam optimizer epsilon (default: 1e-5)')
     parser.add_argument(
         '--entropy_coef', type=str, default="auto_0.2", help='entropy term coefficient (default: 0.01)')
     parser.add_argument(
@@ -75,15 +75,15 @@ def parser():
     parser.add_argument(
         '--num_steps',type=int, default=128, help='frequency of parameter update')
     parser.add_argument(
-        '--buffer_size',type=int,default=20000, help='number of transition tuples in buffer (default: 20000)')
+        '--buffer_size',type=int,default=30000, help='number of transition tuples in buffer (default: 20000)')
     parser.add_argument(
         '--num_mini_batch',type=int, default=64, help='number of batches for sac (default: 32)')
     parser.add_argument(
-        '--learning_starts',type=float,default=500,help='learning starts at n steps (default: 1000)')
+        '--learning_starts',type=float,default=1500,help='learning starts at n steps (default: 1000)')
     parser.add_argument(
         '--n_timesteps', type=int, default=2.5e5, help='number of environment steps to train (default: 1e6)')
     parser.add_argument(
-        '--lr', type=int, default=7.3e-4, help='learning rate')
+        '--lr', type=int, default=3e-4, help='learning rate')
 
     parser.add_argument(
         '--no_cuda', action='store_true', help='debug without cuda')
@@ -127,11 +127,11 @@ def main():
     if not os.path.exists(log_folder): os.makedirs(log_folder)
 
     # build offworld envs
-    # make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', channel_type = 'DEPTH_ONLY', model_name=args.model_name, env_type= 'sim')
-    # make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', model_name=args.model_name, env_type= 'sim')
-    # make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', model_name=args.model_name, env_type= 'real')
+    # env_name list: ['OffWorldDockerMonolithDiscreteSim-v0','OffWorldDockerMonolithContinuousSim-v0',
+    #                  'OffWorldMonolithDiscreteReal-v0','OffWorldMonolithContinuousReal-v0']
     train_env = make_vec_env(make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0',
                  channel_type = 'DEPTH_ONLY', model_name=args.model_name, env_type= 'sim'), num_envs=args.num_envs)
+
     eval_env =  make_vec_env(make_offworld_env(env_name='OffWorldDockerMonolithDiscreteSim-v0', 
                 channel_type = 'DEPTH_ONLY', model_name=args.model_name, env_type= 'sim'), num_envs=1)
     # env = VecFrameStack(env, n_stack=4)
@@ -157,7 +157,7 @@ def main():
         model.set_env(train_env)
 
     
-    callback = EvalCallback(eval_env = eval_env,eval_freq=1000,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
+    callback = EvalCallback(eval_env = eval_env,n_eval_episodes = 10, eval_freq=1000,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
     # callback = CheckpointCallback(save_freq=1000, save_path=log_folder) # checkpoint callback for real env
     model.learn(args.n_timesteps,callback= callback)
 
