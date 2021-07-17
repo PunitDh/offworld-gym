@@ -213,7 +213,8 @@ class SACDiscrete(OffPolicyAlgorithm):
                 # ent_coef = th.exp(self.log_ent_coef.detach())
                 # ent_coef_loss = (-(self.log_ent_coef * (log_prob + self.target_entropy)).detach()).mean()
                 ent_coef = th.exp(self.log_ent_coef.detach())
-                ent_coef_loss = -(self.log_ent_coef * (-th.sum(log_prob * action_prob, dim=1, keepdim=True) + self.target_entropy).detach()).mean()
+                # entropies = -th.sum(action_prob * log_prob, dim=1, keepdim=True).detach()
+                ent_coef_loss = - (self.log_ent_coef * (self.target_entropy + action_prob * log_prob)).mean()
 
                 ent_coef_losses.append(ent_coef_loss.item())
             else:
@@ -225,7 +226,7 @@ class SACDiscrete(OffPolicyAlgorithm):
             # entropy temperature or alpha in the paper
             if ent_coef_loss is not None:
                 self.ent_coef_optimizer.zero_grad()
-                ent_coef_loss.backward()
+                ent_coef_loss.backward(retain_graph=True)
                 self.ent_coef_optimizer.step()
 
             with th.no_grad():

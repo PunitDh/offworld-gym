@@ -39,6 +39,7 @@ from stable_baselines3.common.noise import NormalActionNoise
 
 from offworld_gym_wrapper import make_offworld_env, make_vec_env, ImageToPyTorch
 from custom_cnn_policy import CustomCNN
+from custom_callback import CheckpointAndBufferCallback
 from typing import Callable
 
 
@@ -51,7 +52,9 @@ def parser():
     parser.add_argument(
         '--num_envs', type=int, default=1, help='num of parallel training envs in sim')
     parser.add_argument(
-        '--resume_model_path', type=str, default=None, help='folder to resume training')
+        '--resume_model_path', type=str, default=None, help='model path to resume training')
+    parser.add_argument(
+        '--resume_replay_buffer_path', type=str, default=None, help='buffer path to resume training')
     parser.add_argument(
         '--checkpoint_folder', default='checkpoints/', help='folder to store the checkpoint')
     parser.add_argument(
@@ -75,13 +78,13 @@ def parser():
     parser.add_argument(
         '--buffer_size',type=int,default=30000, help='number of transition tuples in buffer (default: 20000)')
     parser.add_argument(
-        '--num_mini_batch',type=int, default=64, help='number of batches for sac (default: 32)')
+        '--num_mini_batch',type=int, default=128, help='number of batches for sac (default: 32)')
     parser.add_argument(
         '--learning_starts',type=float,default=1500,help='learning starts at n steps (default: 1000)')
     parser.add_argument(
         '--n_timesteps', type=int, default=2.5e5, help='number of environment steps to train (default: 1e6)')
     parser.add_argument(
-        '--lr', type=int, default=3e-4, help='learning rate')
+        '--lr', type=int, default=5e-4, help='learning rate')
 
     parser.add_argument(
         '--no_cuda', action='store_true', help='debug without cuda')
@@ -131,9 +134,9 @@ def main():
     
     # example for real env
     train_env = make_vec_env(make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', 
-                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-3',env_type= 'real', resume=True), num_envs=args.num_envs)
+                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-2',env_type= 'real', resume=True), num_envs=args.num_envs)
     eval_env =  make_vec_env(make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', 
-                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-3', env_type= 'real',resume=True), num_envs=1)
+                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-2', env_type= 'real',resume=True), num_envs=1)
     # env = VecFrameStack(env, n_stack=4)
 
     # initailize PPO agent
@@ -147,7 +150,8 @@ def main():
     policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)
 
     # callback = EvalCallback(eval_env = eval_env,eval_freq=250,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
-    callback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback for real env
+    # callback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback for real env
+    callback = CheckpointAndBufferCallback(save_freq=200, save_path=log_folder) # save model and  buffer for real env
 
     if not args.resume_model_path:
         model = SAC("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.2',buffer_size=args.buffer_size,
@@ -156,9 +160,13 @@ def main():
                     tau=args.tau, learning_starts=args.learning_starts,tensorboard_log=log_folder,device=device,verbose=1)
         
     else:
-        print(f"loading previous model {args.resume_model_path}")
+        print(f"loading previous model {args.resume_model_path} and replay_buffer {args.resume_replay_buffer_path}")
         model = SAC.load(os.path.join(log_folder, args.resume_model_path))
         model.set_env(train_env)
+
+        if args.resume_replay_buffer_path:
+            model.load_replay_buffer(os.path.join(log_folder, args.resume_replay_buffer_path))
+        
 
     model.learn(args.n_timesteps,callback= callback) 
 

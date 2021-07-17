@@ -77,9 +77,9 @@ def parser():
     parser.add_argument(
         '--buffer_size',type=int,default=30000, help='number of transition tuples in buffer (default: 20000)')
     parser.add_argument(
-        '--num_mini_batch',type=int, default=64, help='number of batches for sac (default: 32)')
+        '--num_mini_batch',type=int, default=128, help='number of batches for sac (default: 32)')
     parser.add_argument(
-        '--learning_starts',type=float,default=1500,help='learning starts at n steps (default: 1000)')
+        '--learning_starts',type=float,default=1000,help='learning starts at n steps (default: 1000)')
     parser.add_argument(
         '--n_timesteps', type=int, default=2.5e5, help='number of environment steps to train (default: 1e6)')
     parser.add_argument(
