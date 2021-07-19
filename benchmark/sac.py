@@ -56,6 +56,8 @@ def parser():
     parser.add_argument(
         '--resume_replay_buffer_path', type=str, default=None, help='buffer path to resume training')
     parser.add_argument(
+        '--previous_timesteps', type=int, default=None, help='pick up from previous timesteps to resume training')
+    parser.add_argument(
         '--checkpoint_folder', default='checkpoints/', help='folder to store the checkpoint')
     parser.add_argument(
         '--model_saved_name', default='SAC-REAL-Continuous', help='folder to store the checkpoint')
@@ -119,7 +121,7 @@ def main():
     # setting cuda env
     torch.manual_seed(42)  # universal  magic number 42
     torch.cuda.manual_seed_all(42)
-    device = torch.device("cpu" if args.no_cuda else "cuda:1")
+    device = torch.device("cpu" if args.no_cuda else "cuda:0")
 
     # setting folder and logger
     # checkpoint_folder = os.path.join(args.checkpoint_folder, args.model_name)
@@ -134,9 +136,9 @@ def main():
     
     # example for real env
     train_env = make_vec_env(make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', 
-                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-2',env_type= 'real', resume=True), num_envs=args.num_envs)
-    eval_env =  make_vec_env(make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', 
-                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-2', env_type= 'real',resume=True), num_envs=1)
+                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-4',env_type= 'real', resume=True), num_envs=args.num_envs)
+    # eval_env =  make_vec_env(make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', 
+    #                             model_name=args.model_name, experiment_name='SAC-REAL-Continuous-4', env_type= 'real',resume=False), num_envs=1)
     # env = VecFrameStack(env, n_stack=4)
 
     # initailize PPO agent
@@ -151,7 +153,10 @@ def main():
 
     # callback = EvalCallback(eval_env = eval_env,eval_freq=250,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
     # callback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback for real env
-    callback = CheckpointAndBufferCallback(save_freq=200, save_path=log_folder) # save model and  buffer for real env
+    if not args.previous_timesteps:
+        callback = CheckpointAndBufferCallback(save_freq=200, save_path=log_folder) # save model and  buffer for real env
+    else:
+        callback = CheckpointAndBufferCallback(save_freq=200, save_path=log_folder, previous_timesteps = args.previous_timesteps)
 
     if not args.resume_model_path:
         model = SAC("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.2',buffer_size=args.buffer_size,

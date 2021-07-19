@@ -65,7 +65,7 @@ def parser():
     parser.add_argument(
         '--gamma', type=float, default=0.98, help='eposodic discounted coef gamma(default: 0.99)')
     parser.add_argument(
-        '--tau',type=float, default=0.005, help='Adam optimizer epsilon (default: 1e-5)')
+        '--tau',type=float, default= 5e-3, help='Adam optimizer epsilon (default: 1e-5)')
     parser.add_argument(
         '--entropy_coef', type=str, default="auto_0.2", help='entropy term coefficient (default: 0.01)')
     parser.add_argument(
@@ -77,13 +77,13 @@ def parser():
     parser.add_argument(
         '--buffer_size',type=int,default=30000, help='number of transition tuples in buffer (default: 20000)')
     parser.add_argument(
-        '--num_mini_batch',type=int, default=128, help='number of batches for sac (default: 32)')
+        '--num_mini_batch',type=int, default=256, help='number of batches for sac (default: 32)')
     parser.add_argument(
         '--learning_starts',type=float,default=1000,help='learning starts at n steps (default: 1000)')
     parser.add_argument(
         '--n_timesteps', type=int, default=2.5e5, help='number of environment steps to train (default: 1e6)')
     parser.add_argument(
-        '--lr', type=int, default=3e-4, help='learning rate')
+        '--lr', type=int, default=1e-3, help='learning rate')
 
     parser.add_argument(
         '--no_cuda', action='store_true', help='debug without cuda')

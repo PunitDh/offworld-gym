@@ -148,8 +148,12 @@ class SACDiscrete(OffPolicyAlgorithm):
             # automatically set target entropy if needed
 
             # self.target_entropy = -np.prod(self.env.action_space.shape).astype(np.float32)
+            # self.target_entropy = \
+            #             (-np.log(1.0 / self.env.action_space.n) * 0.98).astype(np.float32)
+
             self.target_entropy = \
-                        (-np.log(1.0 / self.env.action_space.n) * 0.98).astype(np.float32)
+                        -((1.0 / self.env.action_space.n) * 
+                        np.log(1.0 / self.env.action_space.n) * 0.98).astype(np.float32)
         else:
             # Force conversion
             # this will also throw an error for unexpected string

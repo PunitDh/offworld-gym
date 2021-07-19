@@ -27,12 +27,14 @@ class CheckpointAndBufferCallback(BaseCallback):
     :param verbose:
     """
 
-    def __init__(self, save_freq: int, save_path: str, name_prefix: str = "rl_model", verbose: int = 0, replay_buffer: bool = True):
+    def __init__(self, save_freq: int, save_path: str, previous_timesteps: int, name_prefix: str = "rl_model", verbose: int = 0, replay_buffer: bool = True,
+                    ):
         super(CheckpointAndBufferCallback, self).__init__(verbose)
         self.save_freq = save_freq
         self.save_path = save_path
         self.name_prefix = name_prefix
         self.replay_buffer = replay_buffer
+        self.previous_timesteps = previous_timesteps
     def _init_callback(self) -> None:
         # Create folder if needed
         if self.save_path is not None:
@@ -40,7 +42,10 @@ class CheckpointAndBufferCallback(BaseCallback):
 
     def _on_step(self) -> bool:
         if self.n_calls % self.save_freq == 0:
-            path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps}_steps")
+            if not self.previous_timesteps:
+                path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps}_steps")
+            else:
+                path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps + self.previous_timesteps}_steps")
             self.model.save(path)
             if self.replay_buffer:
                 replay_buffer_path = os.path.join(self.save_path, f"{self.name_prefix}_buffer")
