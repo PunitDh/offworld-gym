@@ -160,10 +160,10 @@ def main():
     EvaluationCallback = EvalCallback(eval_env = train_env,eval_freq=1000,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
     # CheckpointCallback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback for real env
     if not args.resume_model_path:
-        CheckpointAndBufferSavingCallback = CheckpointAndBufferCallback(n_models=5,save_freq=10, save_path=log_folder,previous_timesteps = None) # save model and  buffer for real env
+        CheckpointAndBufferSavingCallback = CheckpointAndBufferCallback(n_models=5,save_freq=1000, save_path=log_folder,previous_timesteps = None) # save model and  buffer for real env
     else:
         previous_timesteps = args.resume_model_path.split("_")[-2]
-        CheckpointAndBufferSavingCallback = CheckpointAndBufferCallback(n_models=5,save_freq=10, save_path=log_folder, previous_timesteps = int(previous_timesteps))
+        CheckpointAndBufferSavingCallback = CheckpointAndBufferCallback(n_models=5,save_freq=1000, save_path=log_folder, previous_timesteps = int(previous_timesteps))
     
     model.learn(args.n_timesteps,callback= [EvaluationCallback,CheckpointAndBufferSavingCallback])
 
