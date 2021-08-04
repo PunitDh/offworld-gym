@@ -91,8 +91,8 @@ class CheckpointAndBufferCallback(BaseCallback):
 
             # clean redundant models and buffers
             for index in indices_to_delete:
-                os.delete(os.path.join(self.save_path, f"{self.name_prefix}_{index}_steps"))
-                os.delete(os.path.join(self.save_path, f"{self.name_prefix}_{index}_buffer"))
+                os.delete(os.path.join(self.save_path, f"{self.name_prefix}_{index}_steps.zip"))
+                os.delete(os.path.join(self.save_path, f"{self.name_prefix}_{index}_buffer.pkl"))
 
         if self.n_calls % self.save_freq == 0:
             if not self.previous_timesteps:
