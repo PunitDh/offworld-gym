@@ -23,7 +23,6 @@ import torch.optim as optim
 import shutil
 import copy
 import argparse
-from tensorboardX import SummaryWriter
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning) # to surpress the warning when running real env
 
@@ -39,8 +38,9 @@ from stable_baselines3.common.noise import NormalActionNoise
 from sac_discrete import SACDiscrete
 
 
-from offworld_gym_wrapper import make_offworld_env, make_vec_env, ImageToPyTorch
+from offworld_gym_wrapper import make_offworld_env, make_vec_env
 from custom_cnn_policy import CustomCNN
+from custom_callback import CheckpointAndBufferCallback
 from typing import Callable
 
 
@@ -153,13 +153,19 @@ def main():
                     tau=args.tau, learning_starts=args.learning_starts,tensorboard_log=log_folder,device=device,verbose=1)
     else:
         print(f"loading previous model {args.resume_model_path}")
-        model = SAC.load(os.path.join(log_folder, args.resume_model_path))
+        model = SACDiscrete.load(os.path.join(log_folder, args.resume_model_path))
         model.set_env(train_env)
 
     
-    callback = EvalCallback(eval_env = eval_env,n_eval_episodes = 10, eval_freq=1000,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
-    # callback = CheckpointCallback(save_freq=1000, save_path=log_folder) # checkpoint callback for real env
-    model.learn(args.n_timesteps,callback= callback)
+    EvaluationCallback = EvalCallback(eval_env = train_env,eval_freq=1000,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
+    # CheckpointCallback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback for real env
+    if not args.resume_model_path:
+        CheckpointAndBufferCallback = CheckpointAndBufferCallback(n_models=5,save_freq=10, save_path=log_folder) # save model and  buffer for real env
+    else:
+        previous_timesteps = args.resume_model_path.split("_")[-2]
+        CheckpointAndBufferCallback = CheckpointAndBufferCallback(n_models=5,save_freq=10, save_path=log_folder, previous_timesteps = int(previous_timesteps))
+    
+    model.learn(args.n_timesteps,callback= [EvaluationCallback,CheckpointAndBufferCallback])
 
     # model.save("SAC-Discrete")
     model.save(args.model_saved_name)

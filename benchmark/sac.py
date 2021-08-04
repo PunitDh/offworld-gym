@@ -37,7 +37,7 @@ from stable_baselines3.common.sb2_compat.rmsprop_tf_like import RMSpropTFLike
 from stable_baselines3.common.noise import NormalActionNoise
 
 
-from offworld_gym_wrapper import make_offworld_env, make_vec_env, ImageToPyTorch
+from offworld_gym_wrapper import make_offworld_env, make_vec_env
 from custom_cnn_policy import CustomCNN
 from custom_callback import CheckpointAndBufferCallback
 from typing import Callable
@@ -151,12 +151,13 @@ def main():
     policy_kwargs["optimizer_class"] = RMSpropTFLike
     policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)
 
-    # callback = EvalCallback(eval_env = eval_env,eval_freq=250,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
-    # callback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback for real env
-    if not args.previous_timesteps:
-        callback = CheckpointAndBufferCallback(save_freq=200, save_path=log_folder) # save model and  buffer for real env
+    EvaluationCallback = EvalCallback(eval_env = train_env,eval_freq=250,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
+    # CheckpointCallback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback for real env
+    if not args.resume_model_path:
+        CheckpointAndBufferCallback = CheckpointAndBufferCallback(n_models=5,save_freq=200, save_path=log_folder) # save model and  buffer for real env
     else:
-        callback = CheckpointAndBufferCallback(save_freq=200, save_path=log_folder, previous_timesteps = args.previous_timesteps)
+        previous_timesteps = args.resume_model_path.split("_")[-2]
+        CheckpointAndBufferCallback = CheckpointAndBufferCallback(n_models=5,save_freq=200, save_path=log_folder, previous_timesteps = int(previous_timesteps))
 
     if not args.resume_model_path:
         model = SAC("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.2',buffer_size=args.buffer_size,
@@ -173,7 +174,7 @@ def main():
             model.load_replay_buffer(os.path.join(log_folder, args.resume_replay_buffer_path))
         
 
-    model.learn(args.n_timesteps,callback= callback) 
+    model.learn(args.n_timesteps,callback=[EvaluationCallback,CheckpointAndBufferCallback]) 
 
 
     

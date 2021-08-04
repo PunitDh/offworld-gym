@@ -85,6 +85,7 @@ class SACDiscrete(OffPolicyAlgorithm):
         batch_size: int = 256,
         tau: float = 0.005,
         gamma: float = 0.99,
+        target_entropy_ratio : float = 0.2,
         train_freq: Union[int, Tuple[int, str]] = 1,
         gradient_steps: int = 1,
         action_noise: Optional[ActionNoise] = None,
@@ -136,6 +137,7 @@ class SACDiscrete(OffPolicyAlgorithm):
         self.ent_coef = ent_coef
         self.target_update_interval = target_update_interval
         self.ent_coef_optimizer = None
+        self.target_entropy_ratio = target_entropy_ratio
 
         if _init_setup_model:
             self._setup_model()
@@ -152,8 +154,7 @@ class SACDiscrete(OffPolicyAlgorithm):
             #             (-np.log(1.0 / self.env.action_space.n) * 0.98).astype(np.float32)
 
             self.target_entropy = \
-                        -((1.0 / self.env.action_space.n) * 
-                        np.log(1.0 / self.env.action_space.n) * 0.98).astype(np.float32)
+                        -np.log(1.0 / self.env.action_space.n) * self.target_entropy_ratio
         else:
             # Force conversion
             # this will also throw an error for unexpected string
