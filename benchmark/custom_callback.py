@@ -97,8 +97,10 @@ class CheckpointAndBufferCallback(BaseCallback):
         if self.n_calls % self.save_freq == 0:
             if not self.previous_timesteps:
                 model_path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps}_steps")
+                self.model.save(model_path)
                 if self.replay_buffer:
                     replay_buffer_path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps}_buffer")
+                    self.model.save_replay_buffer(replay_buffer_path)
             else:
                 model_path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps + self.previous_timesteps}_steps")
                 self.model.save(model_path)
