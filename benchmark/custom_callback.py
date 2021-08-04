@@ -66,35 +66,33 @@ class CheckpointAndBufferCallback(BaseCallback):
             os.makedirs(self.save_path, exist_ok=True)
 
     def _on_step(self) -> bool:
-
-        # check previous saved models
-
-        tmp_previous_saved_models = glob.glob(f"{self.name_prefix}_*_steps.zip")
-
-        # check previous model index without duplicate and save into a indices list
-        if len(tmp_previous_saved_models) > 0:
-
-            for model_name in tmp_previous_saved_models:
-                tmp_index = model_name.split("_")[-2]
-                if tmp_index not in self.previous_saved_models_indices:
-                    self.previous_saved_models_indices.append(tmp_index)
-
-            self.previous_saved_models_indices.sort(key=int)
-
-            indices_to_delete = []
-            left = 0
-            right = len(self.previous_saved_models_indices) - self.n_models - 1 # might be negative
-
-            while right >= 0 and right >= left:
-                indices_to_delete.append(self.previous_saved_models_indices[right])
-                right -= 1
-
-            # clean redundant models and buffers
-            for index in indices_to_delete:
-                os.delete(os.path.join(self.save_path, f"{self.name_prefix}_{index}_steps.zip"))
-                os.delete(os.path.join(self.save_path, f"{self.name_prefix}_{index}_buffer.pkl"))
-
+        
         if self.n_calls % self.save_freq == 0:
+             # check previous saved models
+            tmp_previous_saved_models = glob.glob(f"{self.name_prefix}_*_steps.zip")
+
+            # check previous model index without duplicate and save into a indices list
+            if len(tmp_previous_saved_models) > 0:
+
+                for model_name in tmp_previous_saved_models:
+                    tmp_index = model_name.split("_")[-2]
+                    if tmp_index not in self.previous_saved_models_indices:
+                        self.previous_saved_models_indices.append(tmp_index)
+
+                self.previous_saved_models_indices.sort(key=int)
+
+                indices_to_delete = []
+                left = 0
+                right = len(self.previous_saved_models_indices) - self.n_models - 1 # might be negative
+
+                while right >= 0 and right >= left:
+                    indices_to_delete.append(self.previous_saved_models_indices[right])
+                    right -= 1
+
+                # clean redundant models and buffers
+                for index in indices_to_delete:
+                    os.delete(os.path.join(self.save_path, f"{self.name_prefix}_{index}_steps.zip"))
+                    os.delete(os.path.join(self.save_path, f"{self.name_prefix}_{index}_buffer.pkl"))
             if not self.previous_timesteps:
                 model_path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps}_steps")
                 self.model.save(model_path)
