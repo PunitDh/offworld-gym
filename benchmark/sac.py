@@ -154,10 +154,10 @@ def main():
     EvaluationCallback = EvalCallback(eval_env = train_env,eval_freq=250,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
     # CheckpointCallback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback for real env
     if not args.resume_model_path:
-        CheckpointAndBufferCallback = CheckpointAndBufferCallback(n_models=5,save_freq=200, save_path=log_folder) # save model and  buffer for real env
+        CheckpointAndBufferSavingCallback = CheckpointAndBufferCallback(n_models=5,save_freq=200, save_path=log_folder) # save model and  buffer for real env
     else:
         previous_timesteps = args.resume_model_path.split("_")[-2]
-        CheckpointAndBufferCallback = CheckpointAndBufferCallback(n_models=5,save_freq=200, save_path=log_folder, previous_timesteps = int(previous_timesteps))
+        CheckpointAndBufferSavingCallback = CheckpointAndBufferCallback(n_models=5,save_freq=200, save_path=log_folder, previous_timesteps = int(previous_timesteps))
 
     if not args.resume_model_path:
         model = SAC("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.2',buffer_size=args.buffer_size,
@@ -174,7 +174,7 @@ def main():
             model.load_replay_buffer(os.path.join(log_folder, args.resume_replay_buffer_path))
         
 
-    model.learn(args.n_timesteps,callback=[EvaluationCallback,CheckpointAndBufferCallback]) 
+    model.learn(args.n_timesteps,callback=[EvaluationCallback,CheckpointAndBufferSavingCallback]) 
 
 
     
