@@ -73,17 +73,17 @@ def parser():
     parser.add_argument( 
         '--max_grad_norm', type=float, default=0.5, help='max norm of gradients (default: 0.5)')
     parser.add_argument(
-        '--num_steps',type=int, default=128, help='frequency of parameter update')
+        '--num_steps',type=int, default=256, help='frequency of parameter update')
     parser.add_argument(
-        '--buffer_size',type=int,default=30000, help='number of transition tuples in buffer (default: 20000)')
+        '--buffer_size',type=int,default=20000, help='number of transition tuples in buffer (default: 20000)')
     parser.add_argument(
-        '--num_mini_batch',type=int, default=256, help='number of batches for sac (default: 32)')
+        '--num_mini_batch',type=int, default=128, help='number of batches for sac (default: 32)')
     parser.add_argument(
         '--learning_starts',type=float,default=1000,help='learning starts at n steps (default: 1000)')
     parser.add_argument(
         '--n_timesteps', type=int, default=2.5e5, help='number of environment steps to train (default: 1e6)')
     parser.add_argument(
-        '--lr', type=int, default=1e-3, help='learning rate')
+        '--lr', type=int, default=5e-4, help='learning rate')
 
     parser.add_argument(
         '--no_cuda', action='store_true', help='debug without cuda')
@@ -147,7 +147,7 @@ def main():
     policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)
 
     if not args.resume_model_path:
-        model = SACDiscrete("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.2',buffer_size=args.buffer_size,
+        model = SACDiscrete("CnnPolicy", env=eval_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.2',buffer_size=args.buffer_size,
                     learning_rate=linear_schedule(args.lr), batch_size=args.num_mini_batch,gamma=args.gamma, gradient_steps=-1,
                     action_noise=NormalActionNoise(np.array([0,0]), np.array([0.1,0.1])),
                     tau=args.tau, learning_starts=args.learning_starts,tensorboard_log=log_folder,device=device,verbose=1)

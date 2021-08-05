@@ -13,6 +13,13 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv, sync_envs_normalization
 from stable_baselines3.common.callbacks import BaseCallback
 
+import resource
+def using(point=""):
+    usage=resource.getrusage(resource.RUSAGE_SELF)
+    return '''%s: usertime=%s systime=%s mem=%s mb
+           '''%(point,usage[0],usage[1],
+                usage[2]/1024.0 )
+
 class RingBuffer(object):
 
     """
@@ -83,11 +90,12 @@ class CheckpointAndBufferCallback(BaseCallback):
                 self.previous_saved_models_indices.sort(key=int)
 
                 indices_to_delete = []
-                left = 0
-                right = len(self.previous_saved_models_indices) - self.n_models  # might be negative
+                left = 0 # leftmost index to delete
+                right = len(self.previous_saved_models_indices) - self.n_models  # rightmost index to delete
 
-                while right >= 0 and right >= left:
+                while right >= left:
                     indices_to_delete.append(self.previous_saved_models_indices[right])
+                    right -= 1
 
                 # clean redundant models and buffers
                 for index in indices_to_delete:
@@ -101,13 +109,17 @@ class CheckpointAndBufferCallback(BaseCallback):
                 self.model.save(model_path)
                 if self.replay_buffer:
                     replay_buffer_path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps}_buffer")
+                    # print(using(f"Saving {self.name_prefix}_{self.num_timesteps}_buffer_before"))
                     self.model.save_replay_buffer(replay_buffer_path)
+                    # print(using(f"Saving {self.name_prefix}_{self.num_timesteps}_buffer_after"))
+                    # self.model.save_replay_buffer("test_buffer.pkl")
             else:
                 model_path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps + self.previous_timesteps}_steps")
                 self.model.save(model_path)
                 if self.replay_buffer:
                     replay_buffer_path = os.path.join(self.save_path, f"{self.name_prefix}_{self.num_timesteps + self.previous_timesteps}_buffer")
                     self.model.save_replay_buffer(replay_buffer_path)
+                    # self.model.save_replay_buffer("test_buffer.pkl")
 
             if self.verbose > 0:
                 print(f"Saving model checkpoint to {model_path}")

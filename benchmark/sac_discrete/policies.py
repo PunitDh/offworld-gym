@@ -198,9 +198,9 @@ class Actor(BasePolicy):
 
         features = self.extract_features(obs)
         latent_pi = self.latent_pi(features)
-        action_logits= self.action_net(latent_pi)
-
-        return action_logits, {}
+        mean_actions= self.action_net(latent_pi)
+        mean_actions = th.nan_to_num(mean_actions)
+        return mean_actions, {}
 
 
 
@@ -209,8 +209,8 @@ class Actor(BasePolicy):
         # # Note: the action is squashed
         # return self.action_dist.actions_from_params(mean_actions, log_std, deterministic=deterministic, **kwargs)
 
-        action_logits, kwargs = self.get_action_dist_params(obs)
-        return self.action_dist.actions_from_params(action_logits, deterministic=deterministic, **kwargs)
+        mean_actions, kwargs = self.get_action_dist_params(obs)
+        return self.action_dist.actions_from_params(mean_actions, deterministic=deterministic, **kwargs)
 
 
 
@@ -218,9 +218,9 @@ class Actor(BasePolicy):
         # mean_actions, log_std, kwargs = self.get_action_dist_params(obs)
         # return self.action_dist.log_prob_from_params(mean_actions, log_std, **kwargs)
         
-        action_logits, kwargs = self.get_action_dist_params(obs)
+        mean_actions, kwargs = self.get_action_dist_params(obs)
         # # return action and associated log prob
-        return self.action_dist.log_prob_from_params(action_logits, **kwargs)
+        return self.action_dist.log_prob_from_params(mean_actions, **kwargs)
 
 
     def _predict(self, observation: th.Tensor, deterministic: bool = False) -> th.Tensor:
