@@ -23,3 +23,4 @@ benchmark/SAC-Continuous-0.05
 benchmark/SAC-Continuous-auto-0.2
 benchmark/SAC-Continuous-auto-0.25
 benchmark/TD3-Continuous.zip
+benchmark/SAC-SIM-Continuous.zip

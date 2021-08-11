@@ -26,6 +26,7 @@ from offworld_gym.envs.gazebo_docker.protobuf.remote_env_pb2 import Action, Obse
 from offworld_gym.envs.gazebo_docker.protobuf.remote_env_pb2_grpc import RemoteEnvStub
 
 logger = logging.getLogger(__name__)
+# logger.setLevel(logging.DEBUG) # toggle this on for debugging info on client side
 
 OFFWORLD_GYM_DOCKER_IMAGE = os.environ.get("OFFWORLD_GYM_DOCKER_IMAGE", "offworldai/offworld-gym")
 
@@ -38,7 +39,7 @@ CONTAINER_INTERNAL_GAZEBO_PORT_BINDING = f'{GAZEBO_SERVER_INTERNAL_PORT}/tcp'
 GAZEBO_WEB_SERVER_INTERNAL_PORT = 8080
 CONTAINER_INTERNAL_GAZEBO_WEB_PORT_BINDING = f'{GAZEBO_WEB_SERVER_INTERNAL_PORT}/tcp'
 
-MAX_TOLERABLE_HANG_TIME_SECONDS = 90
+MAX_TOLERABLE_HANG_TIME_SECONDS = 150 #150
 HEART_BEAT_TO_CONTAINER_INTERVAL_SECONDS = 2
 
 
@@ -80,12 +81,16 @@ def _heart_beat_to_container_worker(grpc_port, weak_ref_to_parent_env):
             logger.debug("heartbeat thread exiting after parent env was destroyed.")
             return
         try:
-            grpc_stub.HeartBeat(Empty(), timeout=1.0)
+            before = time.time()
+            grpc_stub.HeartBeat(Empty(), timeout=10.0) # change timeout from 1.0 to 10.0
+            logger.debug(f"heartbeat thread restarting time {time.time() - before}")
             ever_made_successful_hearbeat = True
         except grpc.RpcError as rpc_error:
             time_in_hb_loop = time.time() - hb_loop_start_time
             if ever_made_successful_hearbeat:
                 logger.debug(f"heartbeat thread exiting after catching grpc error:\n{rpc_error}")
+                # client side message in case next condition not meet
+                print(f"No heartbeat from the client in {time.time() - before} seconds, killing the server.")
                 return
             elif time_in_hb_loop > MAX_TOLERABLE_HANG_TIME_SECONDS:
                 logger.debug(f"heartbeat thread exiting after taking too long ({time_in_hb_loop} seconds) without successfully sending a single first hearbeat. Latest heartbeat grpc error: {rpc_error}")
@@ -138,6 +143,15 @@ class OffWorldDockerizedEnv(gym.Env):
             #     "bind": "/tmp/.X11-unix",
             #     "mode": "rw"
             # }
+            # "/home/felix/benchmark/offworld-gym/offworld_gym/envs/gazebo_docker": {
+            #     "bind": "/offworld-gym/offworld_gym/envs/gazebo_docker",
+            #     "mode": "rw"
+            # },
+
+            # "/home/felix/benchmark/offworld-gym/offworld_gym/envs/gazebo/offworld_monolith_env.py": {
+            #     "bind": "/offworld-gym/offworld_gym/envs/gazebo/offworld_monolith_env.py",
+            #     "mode": "rw"
+            # }
         }
         container_volumes_str = ""
         for k, v in container_volumes.items():
@@ -158,6 +172,7 @@ class OffWorldDockerizedEnv(gym.Env):
         container_name = f"offworld-gym{uuid.uuid4().hex[:10]}"
 
         container_entrypoint = "/offworld-gym/offworld_gym/envs/gazebo_docker/docker_entrypoint.sh"
+        # container_entrypoint = "/bin/bash"
         docker_run_command = f"docker run --name \'{container_name}\' -it -d --rm" \
                              f"{container_env_str}{container_volumes_str}{container_ports_str} " \
                              f"{OFFWORLD_GYM_DOCKER_IMAGE} {container_entrypoint}"

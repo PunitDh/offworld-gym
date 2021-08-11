@@ -46,9 +46,7 @@ from typing import Callable
 def parser():
     parser = argparse.ArgumentParser(description='SAC')
     parser.add_argument(
-        '--model_name', default='SAC-REAL-Continuous', help='model name')
-    # parser.add_argument(
-    #     '--model_name', default='PPO-REAL-Discrete', help='model name')
+        '--model_name', default='SAC-SIM-Continuous', help='model name')
     parser.add_argument(
         '--num_envs', type=int, default=1, help='num of parallel training envs in sim')
     parser.add_argument(
@@ -60,7 +58,7 @@ def parser():
     parser.add_argument(
         '--checkpoint_folder', default='checkpoints/', help='folder to store the checkpoint')
     parser.add_argument(
-        '--model_saved_name', default='SAC-REAL-Continuous', help='folder to store the checkpoint')
+        '--model_saved_name', default='SAC-SIM-Continuous', help='folder to store the checkpoint')
     parser.add_argument(
         '--log_interval', type=int, default=1, help='log interval, one log per n updates (default: 1)')
     parser.add_argument(
@@ -135,8 +133,8 @@ def main():
     #                  'OffWorldMonolithDiscreteReal-v0','OffWorldMonolithContinuousReal-v0']
     
     # example for real env
-    train_env = make_vec_env(make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', 
-                                model_name=args.model_name, experiment_name='SAC-REAL-Continuous-4',env_type= 'real', resume=True), num_envs=args.num_envs)
+    train_env = make_vec_env(make_offworld_env(env_name='OffWorldDockerMonolithContinuousSim-v0', 
+                                model_name=args.model_name, experiment_name='SAC-SIM-Continuous-1',env_type= 'sim', resume=True), num_envs=args.num_envs)
     # eval_env =  make_vec_env(make_offworld_env(env_name='OffWorldMonolithContinuousReal-v0', 
     #                             model_name=args.model_name, experiment_name='SAC-REAL-Continuous-4', env_type= 'real',resume=False), num_envs=1)
     # env = VecFrameStack(env, n_stack=4)
@@ -151,13 +149,13 @@ def main():
     policy_kwargs["optimizer_class"] = RMSpropTFLike
     policy_kwargs["optimizer_kwargs"] = dict(alpha=0.99, eps=1e-5, weight_decay=0)
 
-    # EvaluationCallback = EvalCallback(eval_env = train_env,eval_freq=250,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
+    EvaluationCallback = EvalCallback(eval_env = train_env,eval_freq=5000,log_path=log_folder,best_model_save_path=log_folder) # evaluation callback for sim env
     # CheckpointCallback = CheckpointCallback(save_freq=500, save_path=log_folder) # checkpoint callback for real env
     if not args.resume_model_path:
-        CheckpointAndBufferSavingCallback = CheckpointAndBufferCallback(n_models=5,save_freq=200, save_path=log_folder, previous_timesteps = None) # save model and  buffer for real env
+        CheckpointAndBufferSavingCallback = CheckpointAndBufferCallback(n_models=5,save_freq=1000, save_path=log_folder, previous_timesteps = None) # save model and  buffer for real env
     else:
         previous_timesteps = args.resume_model_path.split("_")[-2]
-        CheckpointAndBufferSavingCallback = CheckpointAndBufferCallback(n_models=5,save_freq=200, save_path=log_folder, previous_timesteps = int(previous_timesteps))
+        CheckpointAndBufferSavingCallback = CheckpointAndBufferCallback(n_models=5,save_freq=1000, save_path=log_folder, previous_timesteps = int(previous_timesteps))
 
     if not args.resume_model_path:
         model = SAC("CnnPolicy", env=train_env, policy_kwargs=policy_kwargs, ent_coef='auto_0.2',buffer_size=args.buffer_size,
@@ -168,19 +166,15 @@ def main():
     else:
         print(f"loading previous model {args.resume_model_path} and replay_buffer {args.resume_replay_buffer_path}")
         model = SAC.load(os.path.join(log_folder, args.resume_model_path))
+        model.learning_starts = 0
         model.set_env(train_env)
 
         if args.resume_replay_buffer_path:
             model.load_replay_buffer(os.path.join(log_folder, args.resume_replay_buffer_path))
         
 
-    model.learn(args.n_timesteps,callback=[CheckpointAndBufferSavingCallback]) 
+    model.learn(args.n_timesteps,callback=[EvaluationCallback,CheckpointAndBufferSavingCallback]) 
 
-
-    
- 
-    
-    # model.save("SAC-Discrete")
     model.save(args.model_saved_name)
         
 
