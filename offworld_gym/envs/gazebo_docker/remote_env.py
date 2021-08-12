@@ -81,16 +81,13 @@ def _heart_beat_to_container_worker(grpc_port, weak_ref_to_parent_env):
             logger.debug("heartbeat thread exiting after parent env was destroyed.")
             return
         try:
-            before = time.time()
-            grpc_stub.HeartBeat(Empty(), timeout=10.0) # change timeout from 1.0 to 10.0
-            logger.debug(f"heartbeat thread restarting time {time.time() - before}")
+            grpc_stub.HeartBeat(Empty(), timeout=1.0) # change timeout from 1.0 to 10.0
             ever_made_successful_hearbeat = True
         except grpc.RpcError as rpc_error:
             time_in_hb_loop = time.time() - hb_loop_start_time
             if ever_made_successful_hearbeat:
                 logger.debug(f"heartbeat thread exiting after catching grpc error:\n{rpc_error}")
                 # client side message in case next condition not meet
-                print(f"No heartbeat from the client in {time.time() - before} seconds, killing the server.")
                 return
             elif time_in_hb_loop > MAX_TOLERABLE_HANG_TIME_SECONDS:
                 logger.debug(f"heartbeat thread exiting after taking too long ({time_in_hb_loop} seconds) without successfully sending a single first hearbeat. Latest heartbeat grpc error: {rpc_error}")
@@ -172,7 +169,7 @@ class OffWorldDockerizedEnv(gym.Env):
         container_name = f"offworld-gym{uuid.uuid4().hex[:10]}"
 
         container_entrypoint = "/offworld-gym/offworld_gym/envs/gazebo_docker/docker_entrypoint.sh"
-        # container_entrypoint = "/bin/bash"
+
         docker_run_command = f"docker run --name \'{container_name}\' -it -d --rm" \
                              f"{container_env_str}{container_volumes_str}{container_ports_str} " \
                              f"{OFFWORLD_GYM_DOCKER_IMAGE} {container_entrypoint}"
